@@ -19,18 +19,19 @@ __all__ = ['PROFILE',
             'compute_features_from_list_file', 
             'batch_feature_extractor']
 
-PROFILE = {
-           'sample_rate': 44100,
-           'input_audio_format': '.mp3',
-           'downsample_audio': False,
-           'downsample_factor': 2,
-           'endtime': None,
-           'features': ['hpcp',
-                        'key_extractor',
-                        'madmom_features',
-                        'mfcc_htk']
-        }
+# PROFILE = {
+#            'sample_rate': 44100,
+#            'input_audio_format': '.mp3',
+#            'downsample_audio': False,
+#            'downsample_factor': 2,
+#            'endtime': None,
+#            'features': ['hpcp',
+#                         'key_extractor',
+#                         'madmom_features',
+#                         'mfcc_htk']
+#         }
 
+from PROFILE import PROFILE_11kHz as PROFILE
 
 _LOG_FILE_PATH = "acoss.extractor.log"
 _LOG_FILE = log(_LOG_FILE_PATH)
@@ -65,7 +66,7 @@ def compute_features(audio_path, params=PROFILE):
     out_dict = dict()
     # now we compute all the listed features in the profile dict and store the results to a output dictionary
     for method in params['features']:
-        out_dict[method] = getattr(feature, method)()
+        out_dict[method] = getattr(feature, method)(params=params[method])
 
     track_id = os.path.basename(audio_path).replace(params['input_audio_format'], '')
     out_dict['track_id'] = track_id
