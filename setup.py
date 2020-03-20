@@ -16,9 +16,9 @@ setup(
                 'benchmarking suite for cover song identification tasks',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/furkanyesiler/acoss',
-    author='Albin Correya, Furkan Yesiler, Chris Traile, Philip Tovstogan, and Diego Silva',
-    author_email='albin.correya@upf.edu',
+    url="https://github.com/silvadirceu/acoss-1",
+    author='Changed by Dirceu G Silva',
+    author_email='dirceu.silva@co.it.pt',
     packages=find_packages(),
     license='AGPL3.0',
     classifiers=[
@@ -32,7 +32,7 @@ setup(
     ],
     keywords='audio music dsp musicinformationretireval coversongidentification',
     project_urls={
-        'Source': 'https://github.com/furkanyesiler/acoss',
+        'Source': "https://github.com/silvadirceu/acoss-1",
         'Tracker': 'https://github.com/furkanyesiler/acoss/issues',
     },
     include_package_data=True,
@@ -40,7 +40,7 @@ setup(
     install_requires=[
         'numpy>=1.16.5',
         'numba>=0.43.0',
-        'pandas>=0.25.0',
+        'pandas==0.25.3',
         'scipy==1.2.1',
         'scikit-learn==0.19.2',
         'deepdish>=0.3.6',

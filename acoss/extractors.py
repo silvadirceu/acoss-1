@@ -74,6 +74,8 @@ def compute_features(audio_path, params=PROFILE):
     label = audio_path.split('/')[-2]
     out_dict['label'] = label
 
+    out_dict['params'] = params
+
     return out_dict
 
 
