@@ -11,8 +11,8 @@ from joblib import Parallel, delayed
 from progress.bar import Bar
 from shutil import rmtree
 
-from .utils import log, read_txt_file, savelist_to_file, create_audio_path_batches
-from .features import AudioFeatures
+from utils import log, read_txt_file, savelist_to_file, create_audio_path_batches
+from features import AudioFeatures
 
 __all__ = ['PROFILE', 
             'compute_features', 
@@ -148,7 +148,7 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, m
     args = zip(collection_files, feature_path, param_list)
     _LOG_FILE.info("Computing batch feature extraction using '%s' mode the profile: %s \n" % (mode, params))
     if mode == 'parallel':
-        Parallel(n_jobs=n_threads, verbose=1)(delayed(compute_features_from_list_file)\
+        Parallel(n_jobs=n_workers, verbose=1)(delayed(compute_features_from_list_file)\
                                               (cpath, fpath, param) for cpath, fpath, param in args)
     elif mode == 'single':
         tic = time.monotonic()
@@ -177,9 +177,8 @@ if __name__ == '__main__':
                         help="path to the main audio directory of dataset")
     parser.add_argument("-p", "--feature_dir", action="store",
                         help="path to directory where the audio features should be stored")
-    parser.add_argument("-f", "--feature_list", action="store", type=str, default="['hpcp', 'key_extractor', "
-                                                                                  "'crema', 'madmom_features', "
-                                                                                  "'mfcc_htk']",
+    parser.add_argument("-f", "--feature_list", action="store", type=str, dest='alist', nargs='*',
+                        default="['hpcp', 'key_extractor', 'crema', 'madmom_features', 'mfcc_htk']",
                         help="List of features to compute. Eg. ['hpcp' 'crema']")
     parser.add_argument("-m", "--run_mode", action="store", default='parallel',
                         help="Whether to run the extractor in single or parallel mode. "
@@ -191,19 +190,19 @@ if __name__ == '__main__':
 
     print("Args: %s" % cmd_args)
 
-    if not os.path.exists(cmd_args.p):
-        os.mkdir(cmd_args.p)
+    if not os.path.exists(cmd_args.feature_dir):
+        os.mkdir(cmd_args.feature_dir)
 
-    feature_list = list(cmd_args.f)
+    feature_list = cmd_args.alist
     updated_profile = PROFILE.copy()
     del updated_profile['features']
     updated_profile['features'] = feature_list
 
-    batch_feature_extractor(dataset_csv=cmd_args.d,
-                            audio_dir=cmd_args.a,
-                            feature_dir=cmd_args.p,
-                            n_workers=cmd_args.n,
-                            mode=cmd_args.m,
+    batch_feature_extractor(dataset_csv=cmd_args.dataset_csv,
+                            audio_dir=cmd_args.audio_dir,
+                            feature_dir=cmd_args.feature_dir,
+                            n_workers=cmd_args.workers,
+                            mode=cmd_args.run_mode,
                             params=updated_profile)
 
     print("... Done ....")
