@@ -154,8 +154,8 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, m
                                               (cpath, fpath, param) for cpath, fpath, param in args)
     elif mode == 'single':
         tic = time.monotonic()
-        progressbar = Bar('acoss.extractor.batch_feature_extractor', 
-                        max=len(args), 
+        progressbar = Bar('acoss.extractor.batch_feature_extractor',
+                        max=len(args),
                         suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
         for cpath, fpath, param in args:
             compute_features_from_list_file(cpath, fpath, param)
