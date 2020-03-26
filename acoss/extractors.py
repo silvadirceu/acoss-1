@@ -104,18 +104,18 @@ def compute_features_from_list_file(input_txt_file, feature_dir, params=PROFILE)
                         max=len(data), 
                         suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
     for song in data:
-        try:
-            feature_dict = compute_features(audio_path=song, params=params)
-            work_id = song.split('/')[-2]
-            work_dir = "%s%s/" % (feature_dir, work_id)
-            if not os.path.exists(work_dir):
-                os.makedirs(work_dir)
-            # save as h5
-            dd.io.save(work_dir + os.path.basename(song).replace(params['input_audio_format'], '') + '.h5',feature_dict)
-        except:
-            _ERRORS.append(input_txt_file)
-            _ERRORS.append(song)
-            _LOG_FILE.debug("Error: skipping computing features for audio file --%s-- " % song)
+        #try:
+        feature_dict = compute_features(audio_path=song, params=params)
+        work_id = song.split('/')[-2]
+        work_dir = "%s%s/" % (feature_dir, work_id)
+        if not os.path.exists(work_dir):
+            os.makedirs(work_dir)
+        # save as h5
+        dd.io.save(work_dir + os.path.basename(song).replace(params['input_audio_format'], '') + '.h5',feature_dict)
+        # except:
+        #     _ERRORS.append(input_txt_file)
+        #     _ERRORS.append(song)
+        #     _LOG_FILE.debug("Error: skipping computing features for audio file --%s-- " % song)
         progress_bar.next()
     progress_bar.finish()
     _LOG_FILE.info("Process finished in - %s - seconds" % (start_time - time.time()))
