@@ -13,6 +13,8 @@
 #eval "$(pyenv init -)"
 #_PYENVCONF_
 
+# hdf5
+sudo yum -y install hdf5-devel
 
 #After pyenv instalation
 
@@ -20,12 +22,14 @@
 pyenv virtualenv 3.5.9 acoss
 pyenv activate acoss
 
-pip install numpy==1.16.2 cython  tensorflow==1.13.1 keras==2.2.4
+pip install numpy==1.16.2 cython  tensorflow==1.13.1 keras==2.2.4 tables
 
 #git clone https://github.com/silvadirceu/acoss-1.git
 #cd acoss-1
 python setup.py install
 #cd ..
 
-pip install crema librosa==0.6.2 pumpp==0.4 essentia
+pip install crema librosa==0.6.2 pumpp==0.4 essentia madmom
+
+
 
