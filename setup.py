@@ -39,7 +39,7 @@ setup(
     package_data={'': ['data/*.csv']},
     install_requires=[
         'numpy>=1.16.5',
-        'numba>=0.43.0',
+        'numba==0.43.0',
         'pandas==0.25.3',
         'scipy==1.2.1',
         'scikit-learn==0.19.2',

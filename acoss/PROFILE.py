@@ -119,7 +119,7 @@ PROFILE_11kHz = {
            'sample_rate': 11025, #44100,
            'hop_length':128, #512, 1/4 de 44100
            'normalize_gain': False,
-           'input_audio_format': '.mp3',
+           'input_audio_format': '.ogg',
            'downsample_audio': False,
            'downsample_factor': None,
            'endtime': None,

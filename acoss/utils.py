@@ -89,7 +89,7 @@ def create_dataset_filepaths(dataset_csv, root_audio_dir, file_format=".mp3"):
     eg: For a csv file with two columns `work_id, track_id`
         the audio path will be "root_audio_dir/work_id/track_id.mp3"
     """
-    dataset = pd.read_csv(dataset_csv)
+    dataset = pd.read_csv(dataset_csv, dtype=str)
 
     warn = ("Wrong input dataset csv annotation file '%s'. Expected a csv file with the columns of key 'work_id', 'track_id'" 
             % dataset_csv)
@@ -98,7 +98,7 @@ def create_dataset_filepaths(dataset_csv, root_audio_dir, file_format=".mp3"):
         if key not in ['work_id', 'track_id']:
             raise IOError(warn)
 
-    dataset['filepath'] = dataset.apply(lambda x: root_audio_dir + x.work_id + "/" + x.track_id + file_format, axis=1)
+    dataset['filepath'] = dataset.apply(lambda x: root_audio_dir + str(x.work_id) + "/" + str(x.track_id) + file_format, axis=1)
     return dataset.filepath.tolist()
 
 

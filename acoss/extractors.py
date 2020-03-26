@@ -11,8 +11,8 @@ from joblib import Parallel, delayed
 from progress.bar import Bar
 from shutil import rmtree
 
-from utils import log, read_txt_file, savelist_to_file, create_audio_path_batches
-from features import AudioFeatures
+from acoss.utils import log, read_txt_file, savelist_to_file, create_audio_path_batches
+from acoss.features import AudioFeatures
 
 __all__ = ['PROFILE', 
             'compute_features', 
@@ -111,8 +111,7 @@ def compute_features_from_list_file(input_txt_file, feature_dir, params=PROFILE)
             if not os.path.exists(work_dir):
                 os.makedirs(work_dir)
             # save as h5
-            dd.io.save(work_dir + os.path.basename(song).replace(params['input_audio_format'], '') + '.h5',
-                       feature_dict)
+            dd.io.save(work_dir + os.path.basename(song).replace(params['input_audio_format'], '') + '.h5',feature_dict)
         except:
             _ERRORS.append(input_txt_file)
             _ERRORS.append(song)
@@ -139,6 +138,7 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, m
     if not os.path.exists(feature_dir):
         os.makedirs(feature_dir)
     batch_file_dir = "./batches/"
+
     create_audio_path_batches(dataset_csv,
                               dir_to_save=batch_file_dir,
                               root_audio_dir=audio_dir,
@@ -154,13 +154,14 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, m
                                               (cpath, fpath, param) for cpath, fpath, param in args)
     elif mode == 'single':
         tic = time.monotonic()
-        progressbar = Bar('acoss.extractor.batch_feature_extractor', 
-                        max=len(args), 
-                        suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
+        #progressbar = Bar('acoss.extractor.batch_feature_extractor',
+        #                max=len(args),
+        #                suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
         for cpath, fpath, param in args:
+            print(cpath)
             compute_features_from_list_file(cpath, fpath, param)
-            progressbar.next()
-        progressbar.finish()
+        #    progressbar.next()
+        #progressbar.finish()
         _LOG_FILE.info("Single mode feature extraction finished in %s" % (time.monotonic() - tic))
     else:
         raise IOError("Wrong value for the parameter 'mode'. Should be either 'single' or 'parallel'")
@@ -171,7 +172,7 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, m
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="With command-line args, it does batch feature extraction of  \
-            collection of audio files using multiple threads", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+             collection of audio files using multiple threads", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("-d", "--dataset_csv", action="store",
                         help="path to input dataset csv file")
