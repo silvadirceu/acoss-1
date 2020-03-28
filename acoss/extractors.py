@@ -186,7 +186,7 @@ if __name__ == '__main__':
     parser.add_argument("-m", "--run_mode", action="store", default='parallel',
                         help="Whether to run the extractor in single or parallel mode. "
                              "Choose one of ['single', 'parallel']")
-    parser.add_argument("-n", "--workers", action="store", default=-1,
+    parser.add_argument("-n", "--workers", action="store",type=int, default=-1,
                         help="No of workers for running the batch extraction process. Only valid in 'parallel' mode.")
 
     cmd_args = parser.parse_args()

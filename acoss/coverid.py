@@ -8,7 +8,7 @@ import sys
 import os
 from shutil import rmtree
 
-from .utils import log
+from acoss.utils import log
 
 __all__ = ['benchmark', 'algorithm_names']
 
