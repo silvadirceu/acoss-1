@@ -4,7 +4,7 @@ python extractors.py -d '/home/ecad/acoss-1/acoss/data/Covers10k.csv' \
 -a '/home/ecad/AUDIOBASE/Covers10k/Audios/' \
 -p '/home/ecad/Results/features/Covers10k_11khz/' \
 -f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
--m 'parallel'
+-m 'parallel' -n 4
 
 
 

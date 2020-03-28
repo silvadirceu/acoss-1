@@ -130,3 +130,14 @@ def generate_covers80_acoss_csv(covers80_audio_data_path, output_csv):
     
     df = pd.DataFrame({'work_id': work_ids, 'track_id': track_ids})
     df.to_csv(output_csv, index=False)
+
+def chunkIt(seq, num):
+    avg = len(seq) / float(num)
+    out = []
+    last = 0.0
+
+    while last < len(seq):
+        out.append(seq[int(last):int(last + avg)])
+        last += avg
+
+    return out
