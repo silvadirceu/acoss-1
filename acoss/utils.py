@@ -131,8 +131,17 @@ def generate_covers80_acoss_csv(covers80_audio_data_path, output_csv):
     df = pd.DataFrame({'work_id': work_ids, 'track_id': track_ids})
     df.to_csv(output_csv, index=False)
 
-def chunkIt(seq, num):
-    avg = len(seq) / float(num)
+
+def split_list_with_N_elements(seq,n):
+    #spli a list in sublists with n elements + the reminder
+
+    newlist = [seq[i * n:(i + 1) * n] for i in range((len(seq) + n - 1) // n )]
+    return newlist
+
+
+def split_list_in_N_parts(seq, n):
+    # split a list in N parts + the reminder
+    avg = len(seq) / float(n)
     out = []
     last = 0.0
 

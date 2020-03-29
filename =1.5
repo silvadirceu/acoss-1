@@ -1,0 +1,32 @@
+Collecting numba==0.43.0
+  Downloading https://files.pythonhosted.org/packages/8c/0e/96af4929b5cf75fa9db37889fd4a06c7ca392162c47066649575a2e41f2f/numba-0.43.0-cp35-cp35m-manylinux1_x86_64.whl (3.3MB)
+Collecting pandas==0.25.3
+  Using cached https://files.pythonhosted.org/packages/a9/55/e3f34ad611f703454b951bab6bde9a432f1af92994cebc4d8e0ec0af38c4/pandas-0.25.3-cp35-cp35m-manylinux1_x86_64.whl
+Collecting scipy==1.2.1
+  Downloading https://files.pythonhosted.org/packages/f0/30/526bee2ce18c066f9ff13ba89603f6c2b96c9fd406b57a21a7ba14bf5679/scipy-1.2.1-cp35-cp35m-manylinux1_x86_64.whl (24.7MB)
+Collecting scikit-learn==0.19.2
+  Downloading https://files.pythonhosted.org/packages/b6/e2/a1e254a4a4598588d4fe88b45ab88a226c289ecfd0f6c90474eb6a9ea6b3/scikit_learn-0.19.2-cp35-cp35m-manylinux1_x86_64.whl (4.9MB)
+Collecting deepdish
+  Downloading https://files.pythonhosted.org/packages/6e/39/2a47c852651982bc5eb39212ac110284dd20126bdc7b49bde401a0139f5d/deepdish-0.3.6-py2.py3-none-any.whl
+Collecting progress
+  Downloading https://files.pythonhosted.org/packages/38/ef/2e887b3d2b248916fc2121889ce68af8a16aaddbe82f9ae6533c24ff0d2b/progress-1.5.tar.gz
+Collecting llvmlite>=0.28.0dev0 (from numba==0.43.0)
+  Using cached https://files.pythonhosted.org/packages/ab/7d/accde4254f32a5b9f2d354a85e50158f955363a5b5bbe7cc6c64f6f26c26/llvmlite-0.31.0-cp35-cp35m-manylinux1_x86_64.whl
+Requirement already satisfied: numpy in /home/dirceusilva/.pyenv/versions/3.5.9/envs/acoss/lib/python3.5/site-packages (from numba==0.43.0)
+Collecting pytz>=2017.2 (from pandas==0.25.3)
+  Using cached https://files.pythonhosted.org/packages/e7/f9/f0b53f88060247251bf481fa6ea62cd0d25bf1b11a87888e53ce5b7c8ad2/pytz-2019.3-py2.py3-none-any.whl
+Collecting python-dateutil>=2.6.1 (from pandas==0.25.3)
+  Using cached https://files.pythonhosted.org/packages/d4/70/d60450c3dd48ef87586924207ae8907090de0b306af2bce5d134d78615cb/python_dateutil-2.8.1-py2.py3-none-any.whl
+Requirement already satisfied: tables in /home/dirceusilva/.pyenv/versions/3.5.9/envs/acoss/lib/python3.5/site-packages (from deepdish)
+Requirement already satisfied: six>=1.5 in /home/dirceusilva/.pyenv/versions/3.5.9/envs/acoss/lib/python3.5/site-packages (from python-dateutil>=2.6.1->pandas==0.25.3)
+Requirement already satisfied: numexpr>=2.6.2 in /home/dirceusilva/.pyenv/versions/3.5.9/envs/acoss/lib/python3.5/site-packages (from tables->deepdish)
+Building wheels for collected packages: progress
+  Running setup.py bdist_wheel for progress: started
+  Running setup.py bdist_wheel for progress: finished with status 'done'
+  Stored in directory: /home/dirceusilva/.cache/pip/wheels/6c/c8/80/32a294e3041f006c661838c05a411c7b7ffc60ff939d14e116
+Successfully built progress
+Installing collected packages: llvmlite, numba, pytz, python-dateutil, pandas, scipy, scikit-learn, deepdish, progress
+  Found existing installation: scipy 1.4.1
+    Uninstalling scipy-1.4.1:
+      Successfully uninstalled scipy-1.4.1
+Successfully installed deepdish-0.3.6 llvmlite-0.31.0 numba-0.43.0 pandas-0.25.3 progress-1.5 python-dateutil-2.8.1 pytz-2019.3 scikit-learn-0.19.2 scipy-1.2.1
