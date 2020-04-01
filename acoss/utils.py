@@ -64,7 +64,7 @@ def savelist_to_file(path_list, filename):
     doc.close()
 
 
-def create_audio_path_batches(dataset_csv, dir_to_save, root_audio_dir="./", audio_format=".mp3", reset=False):
+def create_audio_path_batches(dataset_csv, dir_to_save, root_audio_dir="./", audio_format=".mp3", reset=False, n_workers=None):
     """Create batches of audio file paths for batch processing given a input dataset_csv annotation"""
     if not os.path.exists(dir_to_save):
         os.mkdir(dir_to_save)
@@ -72,7 +72,10 @@ def create_audio_path_batches(dataset_csv, dir_to_save, root_audio_dir="./", aud
         rmtree(dir_to_save)
 
     data_paths = create_dataset_filepaths(dataset_csv, root_audio_dir, audio_format)
-    batch_size = len(data_paths)
+    if n_workers:
+        batch_size = n_workers
+    else:
+        batch_size = len(data_paths)
 
     for path in data_paths:
         if not os.path.exists(path):

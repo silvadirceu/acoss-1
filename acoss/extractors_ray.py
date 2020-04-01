@@ -156,7 +156,8 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, m
     create_audio_path_batches(dataset_csv,
                               dir_to_save=batch_file_dir,
                               root_audio_dir=audio_dir,
-                              audio_format=params['input_audio_format'])
+                              audio_format=params['input_audio_format'],
+                              n_workers=n_workers)
 
     collection_files = glob.glob(batch_file_dir + '*.txt')
     feature_path = [feature_dir for i in range(len(collection_files))]
@@ -168,10 +169,12 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, m
     if mode == 'parallel':
         music_groups = split_list_with_N_elements(collection_files,n_workers)
 
-        for cpaths in music_groups:
-            params_id = ray.put(params)
-            features_dir_id = ray.put(feature_dir)
-            ray.get([compute_features_from_list_file.remote(cpath,features_dir_id,params_id) for cpath in cpaths])
+        print("Music Groups:", len(music_groups))
+
+        # for cpaths in music_groups:
+        #     params_id = ray.put(params)
+        #     features_dir_id = ray.put(feature_dir)
+        #     ray.get([compute_features_from_list_file.remote(cpath,features_dir_id,params_id) for cpath in cpaths])
 
         #Parallel(n_jobs=n_workers, verbose=1)(delayed(compute_features_from_list_file)\
         #                                      (cpath, fpath, param) for cpath, fpath, param in args)
