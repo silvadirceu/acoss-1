@@ -96,7 +96,7 @@ def compute_features_from_list_file(input_txt_file, feature_dir, params=PROFILE)
     """
 
     start_time = time.monotonic()
-    _LOG_FILE.info("Extracting features for %s " % input_txt_file)
+    _LOG_FILE.info("Extracting Batch File: %s " % input_txt_file)
     data = read_txt_file(input_txt_file)
     data = [path for path in data if os.path.exists(path)]
     if len(data) < 1:
@@ -108,6 +108,7 @@ def compute_features_from_list_file(input_txt_file, feature_dir, params=PROFILE)
                             max=len(data),
                             suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
     for song in data:
+        _LOG_FILE.info("Extracting features for %s " % song)
         try:
             work_id = song.split('/')[-2]
             work_dir = os.path.join(feature_dir, work_id+"/")
@@ -165,16 +166,13 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, m
     args = zip(collection_files, feature_path, param_list)
     _LOG_FILE.info("Computing batch feature extraction using '%s' mode the profile: %s \n" % (mode, params))
 
-
     if mode == 'parallel':
         music_groups = split_list_with_N_elements(collection_files,n_workers)
 
-        print("Music Groups:", len(music_groups))
-
-        # for cpaths in music_groups:
-        #     params_id = ray.put(params)
-        #     features_dir_id = ray.put(feature_dir)
-        #     ray.get([compute_features_from_list_file.remote(cpath,features_dir_id,params_id) for cpath in cpaths])
+        for cpaths in music_groups:
+            params_id = ray.put(params)
+            features_dir_id = ray.put(feature_dir)
+            ray.get([compute_features_from_list_file.remote(cpath,features_dir_id,params_id) for cpath in cpaths])
 
         #Parallel(n_jobs=n_workers, verbose=1)(delayed(compute_features_from_list_file)\
         #                                      (cpath, fpath, param) for cpath, fpath, param in args)
