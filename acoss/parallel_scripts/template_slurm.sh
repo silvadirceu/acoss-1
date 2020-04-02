@@ -2,13 +2,16 @@
 
 ##extracted from https://ray.readthedocs.io/en/latest/deploying-on-slurm.html
 
-#SBATCH --job-name=test
-#SBATCH --cpus-per-task=5
-#SBATCH --mem-per-cpu=1GB
-#SBATCH --nodes=3
+#SBATCH --partition=normal
+#SBATCH --job-name=covers10k
+##SBATCH --cpus-per-task=24
+#SBATCH --mem-per-cpu=3GB
+#SBATCH --nodes=16
 #SBATCH --tasks-per-node 1
+#SBATCH --mail-user=dirceu.silva@co.it.pt
+#SBATCH --mail-type=BEGIN|END|FAIL
 
-worker_num=2 # Must be one less that the total number of nodes
+worker_num=15 # Must be one less that the total number of nodes
 
 # module load Langs/Python/3.6.4 # This will vary depending on your environment
 # source venv/bin/activate
@@ -35,4 +38,10 @@ do
   sleep 5
 done
 
-python -u example_trainer.py $redis_password 15 # Pass the total number of allocated CPUs
+#python -u extracton.py $redis_password 15 # Pass the total number of allocated CPUs
+
+python -u extractors_ray.py -d '/mnt/Data/dirceusilva/dados/ECAD/Covers10k/Covers10k.csv' \
+-a '/home/covers10k/dirceusilva/data/Covers10k/Audios/' \
+-p '/home/covers10k/dirceusilva/data/Covers10k/features/' \
+-f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
+-m 'parallel' -c 1 -n 384 -r 0 -w $redis_password

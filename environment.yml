@@ -1,0 +1,27 @@
+name: acoss
+channels:
+    - conda-forge
+    - bioconda
+    - anaconda
+    - ska
+dependencies:
+  - python=3.5
+  - cython
+  - ray
+  - psutil
+  - tables
+  - deepdish
+  - progress
+  - pip:
+    - numpy==1.16.5
+    - tensorflow==1.13.1
+    - keras==2.2.4
+    - numba==0.43.0
+    - pandas==0.25.3
+    - scipy==1.2.1
+    - scikit-learn==0.19.2
+    - crema
+    - librosa==0.6.2
+    - pumpp==0.4
+    - essentia
+    - madmom
