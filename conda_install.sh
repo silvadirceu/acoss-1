@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 conda create -n acoss python=3.5
 conda activate acoss
