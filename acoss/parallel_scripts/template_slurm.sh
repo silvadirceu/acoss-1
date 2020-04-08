@@ -2,7 +2,7 @@
 
 ##extracted from https://ray.readthedocs.io/en/latest/deploying-on-slurm.html
 
-#SBATCH --partition=normal
+#SBATCH --partition=long
 #SBATCH --job-name=covers10k
 ##SBATCH --cpus-per-task=24
 #SBATCH --mem-per-cpu=3GB
@@ -40,7 +40,7 @@ done
 
 #python -u extracton.py $redis_password 15 # Pass the total number of allocated CPUs
 
-python -u extractors_ray.py -d '/mnt/Data/dirceusilva/dados/ECAD/Covers10k/Covers10k.csv' \
+python -u extractors_ray.py -d '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data/Covers10k_p.csv' \
 -a '/home/covers10k/dirceusilva/data/Covers10k/Audios/' \
 -p '/home/covers10k/dirceusilva/data/Covers10k/features/' \
 -f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
