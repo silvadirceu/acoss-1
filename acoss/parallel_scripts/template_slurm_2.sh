@@ -30,25 +30,33 @@ node1=${nodes_array[0]}
 ip_prefix=$(srun --nodes=1 --ntasks=1 -w $node1 hostname --ip-address) # Making address
 suffix=':6379'
 ip_head=$ip_prefix$suffix
-redis_password=$(uuidgen)
+echo "IP Head: $ip_head"
 
-export ip_head # Exporting for latter access by trainer.py
+export ip_head
 
 echo "STARTING HEAD at $node1"
-srun --nodes=1 --ntasks=1 -w $node1 ~/ray start --block --head --redis-port=6379 --redis-password=$redis_password & # Starting the head
+srun --nodes=1 --ntasks=1 -w $node1 /home/covers10k/dirceusilva/scripts/acoss-1/acoss/start_head.sh &
 sleep 5
 
 for ((  i=1; i<=$worker_num; i++ ))
 do
-  node2=${nodes_array[$i]}
-  srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password & # Starting the workers
-  sleep 5
+ node_i=${nodes_array[$i]}
+ echo "STARTING WORKER $i at $node_i"
+ srun --nodes=1 --ntasks=1 -w $node_i /home/covers10k/dirceusilva/scripts/acoss-1/acoss/start_worker.sh $ip_head $i &
+ sleep 5
 done
 
 #python -u extracton.py $redis_password 15 # Pass the total number of allocated CPUs
-
+echo "RUNNING SCRIPT"
 python -u extractors_ray.py -d '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data/Covers10k_p.csv' \
 -a '/home/covers10k/dirceusilva/data/Covers10k/Audios/' \
 -p '/home/covers10k/dirceusilva/data/Covers10k/features/' \
 -f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
 -m 'parallel' -c 1 -n 384 -r 0 -w $redis_password
+
+echo "ENDING SLEEP"
+pkill -P $(<~/pid_storage/head.pid) sleep
+for ((  i=1; i<=$worker_num; i++ ))
+do
+ pkill -P $(<~/pid_storage/worker${i}.pid) sleep
+done
