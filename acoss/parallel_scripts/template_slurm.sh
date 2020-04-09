@@ -5,11 +5,11 @@
 #SBATCH --partition=normal
 #SBATCH --job-name=covers10k
 ##SBATCH --cpus-per-task=24
-#SBATCH --mem-per-cpu=3GB
+#SBATCH --mem=70GB
 #SBATCH --nodes=16
 #SBATCH --tasks-per-node 1
 #SBATCH --mail-user=dirceu.silva@co.it.pt
-#SBATCH --mail-type=BEGIN|END|FAIL
+#SBATCH --mail-type=ALL
 #SBATCH --time=1-00:00:00
 #SBATCH --output=/home/covers10k/dirceusilva/data/Covers10k/output.txt
 #SBATCH --error=/home/covers10k/dirceusilva/data/Covers10k/error.txt
@@ -36,12 +36,14 @@ export ip_head # Exporting for latter access by trainer.py
 
 echo "STARTING HEAD at $node1"
 srun --nodes=1 --ntasks=1 -w $node1 ray start --block --head --redis-port=6379 --redis-password=$redis_password & # Starting the head
+--object-store-memory=$((1024 * 1024 * 1024))  --memory=$((70 * 1024 * 1024 * 1024)) &
 sleep 5
 
 for ((  i=1; i<=$worker_num; i++ ))
 do
   node2=${nodes_array[$i]}
   srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password & # Starting the workers
+  --object-store-memory=$((1024 * 1024 * 1024))  --memory=$((70 * 1024 * 1024 * 1024)) &
   sleep 5
 done
 

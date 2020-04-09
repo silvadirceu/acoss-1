@@ -239,7 +239,9 @@ if __name__ == '__main__':
     print("Nr CPUs: %d" % num_cpus)
 
     if cmd_args.type_cluster == 1: # Slurm Cluster Configuration
-        ray.init(address=os.environ["ip_head"], redis_password=cmd_args.redis_password)
+        ray.init(address=os.environ["ip_head"], redis_password=cmd_args.redis_password,
+                 memory=70 * 1024 * 1024 * 1024, # 70 GB
+                 object_store_memory=1 * 1024 * 1024 * 1024) # 1 GB
     else: # Use Ray in PC
         if cmd_args.workers == -1:
             num_cpus = psutil.cpu_count(logical=False)
