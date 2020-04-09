@@ -20,7 +20,7 @@ worker_num=15 # Must be one less that the total number of nodes
 # module load Langs/Python/3.6.4 # This will vary depending on your environment
 # source venv/bin/activate
 
-conda activate acoss
+# conda activate acoss
 
 nodes=$(scontrol show hostnames $SLURM_JOB_NODELIST) # Getting the node names
 nodes_array=( $nodes )
@@ -35,7 +35,7 @@ redis_password=$(uuidgen)
 export ip_head # Exporting for latter access by trainer.py
 
 echo "STARTING HEAD at $node1"
-srun --nodes=1 --ntasks=1 -w $node1 ~/ray start --block --head --redis-port=6379 --redis-password=$redis_password & # Starting the head
+srun --nodes=1 --ntasks=1 -w $node1 ray start --block --head --redis-port=6379 --redis-password=$redis_password & # Starting the head
 sleep 5
 
 for ((  i=1; i<=$worker_num; i++ ))
