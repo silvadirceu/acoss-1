@@ -35,15 +35,17 @@ redis_password=$(uuidgen)
 export ip_head # Exporting for latter access by trainer.py
 
 echo "STARTING HEAD at $node1"
-srun --nodes=1 --ntasks=1 -w $node1 ray start --block --head --redis-port=6379 --redis-password=$redis_password & # Starting the head
---object-store-memory=$((1024 * 1024 * 1024))  --memory=$((70 * 1024 * 1024 * 1024)) &
+# Starting the head
+srun --nodes=1 --ntasks=1 -w $node1 ray start --block --head --redis-port=6379 --redis-password=$redis_password \
+--object-store-memory=$((1024 * 1024 * 1024))  --memory=$((3 * 1024 * 1024 * 1024)) &
 sleep 5
 
 for ((  i=1; i<=$worker_num; i++ ))
 do
+  # Starting the workers
   node2=${nodes_array[$i]}
-  srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password & # Starting the workers
-  --object-store-memory=$((1024 * 1024 * 1024))  --memory=$((70 * 1024 * 1024 * 1024)) &
+  srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password \
+  --object-store-memory=$((1024 * 1024 * 1024))  --memory=$((3 * 1024 * 1024 * 1024)) &
   sleep 5
 done
 
