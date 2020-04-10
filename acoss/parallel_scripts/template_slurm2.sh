@@ -51,7 +51,7 @@ done
 
 #python -u extracton.py $redis_password 15 # Pass the total number of allocated CPUs
 
-python -u extractors_ray.py -d '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data/Covers10k_1.csv' \
+python -u extractors_ray.py -d '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data/Covers10k_2.csv' \
 -a '/home/covers10k/dirceusilva/data/Covers10k/Audios/' \
 -p '/home/covers10k/dirceusilva/data/Covers10k/features/' \
 -f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
