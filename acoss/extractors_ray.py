@@ -136,7 +136,7 @@ def compute_features_from_list_file(input_txt_file, feature_dir, params=PROFILE)
     _LOG_FILE.info("Process finished in - %s - seconds" % (start_time - time.time()))
 
 
-def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, mode='parallel', params=PROFILE):
+def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, batchesdir,  n_workers=-1, mode='parallel', params=PROFILE):
     """
     Compute parallelised feature extraction process from a collection of input audio file path txt files
 
@@ -152,7 +152,7 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, n_workers=-1, m
     """
     if not os.path.exists(feature_dir):
         os.makedirs(feature_dir)
-    batch_file_dir = "./batches/"
+    batch_file_dir = batchesdir
 
     create_audio_path_batches(dataset_csv,
                               dir_to_save=batch_file_dir,
@@ -219,6 +219,8 @@ if __name__ == '__main__':
                         help="Cluster type to use (0 - without cluster, 1 - Slurm) - default 0.")
     parser.add_argument("-r", "--overwrite", action="store", type=int, default=1,
                         help="Overwrite existing files (0, 1) - default 1.")
+    parser.add_argument("-b", "--batchesdir", action="store", type=str, default="./batches/",
+                        help="batches dir.")
 
 
     cmd_args = parser.parse_args()
@@ -234,6 +236,7 @@ if __name__ == '__main__':
     updated_profile['features'] = feature_list
     updated_profile['verbose'] = cmd_args.verbose
     updated_profile['overwrite'] = bool(cmd_args.overwrite)
+
     # Start Ray
     num_cpus = cmd_args.workers
     print("Nr CPUs: %d" % num_cpus)
@@ -250,9 +253,15 @@ if __name__ == '__main__':
     batch_feature_extractor(dataset_csv=cmd_args.dataset_csv,
                             audio_dir=cmd_args.audio_dir,
                             feature_dir=cmd_args.feature_dir,
+                            batchesdir = cmd_args.batchesdir,
                             n_workers=num_cpus,
                             mode=cmd_args.run_mode,
                             params=updated_profile)
 
     print("... Done ....")
     print(" -- PROFILE INFO -- \n %s" % updated_profile)
+
+
+
+    #List File by Datetime
+    # find -name '*.h5' -exec ls -rtl {} +

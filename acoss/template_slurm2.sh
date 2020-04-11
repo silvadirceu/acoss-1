@@ -54,5 +54,6 @@ done
 python -u extractors_ray.py -d '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data/Covers10k_2.csv' \
 -a '/home/covers10k/dirceusilva/data/Covers10k/Audios/' \
 -p '/home/covers10k/dirceusilva/data/Covers10k/features/' \
+-b './batches_2/' \
 -f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
 -m 'parallel' -c 1 -n 384 -r 0 -w $redis_password
