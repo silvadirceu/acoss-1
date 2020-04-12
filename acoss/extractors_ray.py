@@ -189,7 +189,7 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, batchesdir,  n_
     else:
         raise IOError("Wrong value for the parameter 'mode'. Should be either 'single' or 'parallel'")
     savelist_to_file(_ERRORS,'_erros_acoss.extractors.txt')
-    rmtree(batch_file_dir)
+    #rmtree(batch_file_dir)
     _LOG_FILE.info("Log file located at '%s'" % _LOG_FILE_PATH)
 
 
