@@ -53,8 +53,7 @@ def compute_features(audio_path, params=PROFILE):
                         /audio_file.mp3 (or any other format)
 
     :param audio_path: path to audio file
-    :param params: dictionary of parameters for the extractor (refer 'extractor.PROFILE' for default params)
-
+    :param params: dictionary of parameters for the extractor (refer 'extractor.PROFILE' for default param
     :return: a python dictionary with all the requested features computed as key, value pairs.
     """
     feature = AudioFeatures(audio_file=audio_path,

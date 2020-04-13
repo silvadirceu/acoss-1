@@ -52,10 +52,14 @@ class AudioFeatures(object):
         self.hop_length = hop_length
         self.fs = sample_rate
         self.audio_file = audio_file
-        if normalize_gain:
-            self.audio_vector = estd.EasyLoader(filename=audio_file, sampleRate=self.fs, replayGain=-9)()
-        elif mono:
-            self.audio_vector = estd.MonoLoader(filename=audio_file, sampleRate=self.fs)()
+        try:
+            if normalize_gain:
+                self.audio_vector = estd.EasyLoader(filename=audio_file, sampleRate=self.fs, replayGain=-9)()
+            elif mono:
+                self.audio_vector = estd.MonoLoader(filename=audio_file, sampleRate=self.fs)()
+        except:
+            self.audio_vector, fs = librosa.load(audio_file, sr=self.fs, mono=True)
+
         if verbose:
             print("== Audio vector of %s loaded with shape %s and sample rate %s =="
                   % (audio_file, self.audio_vector.shape, self.fs))
