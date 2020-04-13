@@ -6,15 +6,15 @@
 ##-f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
 ##-m 'parallel' -n 18 -r 0
 
-python extractors_ray.py -d '/mnt/Data/dirceusilva/dados/ECAD/Covers10k/Covers10k.csv' \
+python extractors_ray.py -d '/mnt/Data/dirceusilva/development/libs/acoss-1/acoss/data/Covers10k_p.csv' \
 -a '/mnt/Data/dirceusilva/dados/ECAD/Covers10k/Audios/' \
--p '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/' \
+-p '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/features/' \
 -f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
 -m 'parallel' -n 8 -r 0
 
 
-#python extractors.py -d 'data/Covers10k.csv' \
+#python extractors.py -d 'data/Covers10k_p.csv' \
 #-a '/media/dirceu/Backup2T/BaseDados/Covers10k/Audios/' \
-#-p '/media/dirceu/Backup2T/Testes/Cover/Covers10k_11khz/' \
+#-p '/media/dirceu/Backup2T/Testes/Cover/Covers10k_11khz/features/' \
 #-f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
 #-m 'parallel' -n 8 -r 0

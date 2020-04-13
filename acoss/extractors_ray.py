@@ -109,23 +109,23 @@ def compute_features_from_list_file(input_txt_file, feature_dir, params=PROFILE)
                             suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
     for song in data:
         _LOG_FILE.info("Extracting features for %s " % song)
-        try:
-            work_id = song.split('/')[-2]
-            work_dir = os.path.join(feature_dir, work_id+"/")
-            if not os.path.exists(work_dir):
-                os.makedirs(work_dir)
-            filename = work_dir + os.path.basename(song).replace(params['input_audio_format'], '') + '.h5'
+        #try:
+        work_id = song.split('/')[-2]
+        work_dir = os.path.join(feature_dir, work_id+"/")
+        if not os.path.exists(work_dir):
+            os.makedirs(work_dir)
+        filename = work_dir + os.path.basename(song).replace(params['input_audio_format'], '') + '.h5'
 
-            # extract features
-            if params['overwrite'] or not os.path.exists(filename):
-                feature_dict = compute_features(audio_path=song, params=params)
+        # extract features
+        if params['overwrite'] or not os.path.exists(filename):
+            feature_dict = compute_features(audio_path=song, params=params)
 
-                #save as h5
-                dd.io.save(filename,feature_dict)
-        except:
-            _ERRORS.append(input_txt_file)
-            _ERRORS.append(song)
-            _LOG_FILE.debug("Error: skipping computing features for audio file --%s-- " % song)
+            #save as h5
+            dd.io.save(filename,feature_dict)
+        # except:
+        #     _ERRORS.append(input_txt_file)
+        #     _ERRORS.append(song)
+        #     _LOG_FILE.debug("Error: skipping computing features for audio file --%s-- " % song)
 
         if params['verbose'] >= 1:
             progress_bar.next()
@@ -262,6 +262,11 @@ if __name__ == '__main__':
     print(" -- PROFILE INFO -- \n %s" % updated_profile)
 
 
-
     #List File by Datetime
     # find -name '*.h5' -exec ls -rtl {} +
+
+    #Nr files in a directory
+    # find. - type f | wc - l
+
+    # nr sub-directories in a directory
+    # find. - type d | wc - l
