@@ -73,7 +73,7 @@ def create_audio_path_batches(dataset_csv, dir_to_save, root_audio_dir="./", aud
 
     data_paths = create_dataset_filepaths(dataset_csv, root_audio_dir, audio_format)
     if n_workers:
-        batch_size = n_workers
+        batch_size = min(n_workers,len(data_paths))
     else:
         batch_size = len(data_paths)
 

@@ -57,7 +57,12 @@ def compute_features(audio_path, params=PROFILE):
 
     :return: a python dictionary with all the requested features computed as key, value pairs.
     """
-    feature = AudioFeatures(audio_file=audio_path, sample_rate=params['sample_rate'])
+    feature = AudioFeatures(audio_file=audio_path,
+                            mono=params['mono'],
+                            hop_length=params['hop_length'],
+                            sample_rate=params['sample_rate'],
+                            normalize_gain=params['normalize_gain'])
+
     if feature.audio_vector.shape[0] == 0:
         raise IOError("Empty or invalid audio recording file -%s-" % audio_path)
 
