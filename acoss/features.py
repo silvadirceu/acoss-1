@@ -52,13 +52,16 @@ class AudioFeatures(object):
         self.hop_length = hop_length
         self.fs = sample_rate
         self.audio_file = audio_file
-        try:
-            if normalize_gain:
+        if normalize_gain:
+            if os.path.splitext(self.audio_file)[1] == ".wav":
                 self.audio_vector = estd.EasyLoader(filename=audio_file, sampleRate=self.fs, replayGain=-9)()
-            elif mono:
+            else:
+                self.audio_vector, fs = librosa.load(audio_file, sr=self.fs, mono=True)
+        elif mono:
+            if os.path.splitext(self.audio_file)[1] == ".wav":
                 self.audio_vector = estd.MonoLoader(filename=audio_file, sampleRate=self.fs)()
-        except:
-            self.audio_vector, fs = librosa.load(audio_file, sr=self.fs, mono=True)
+            else:
+                self.audio_vector, fs = librosa.load(audio_file, sr=self.fs, mono=True)
 
         if verbose:
             print("== Audio vector of %s loaded with shape %s and sample rate %s =="
@@ -178,22 +181,45 @@ class AudioFeatures(object):
 
         beatproc = DBNBeatTrackingProcessor(fps=fps)
         tempoproc = TempoEstimationProcessor(fps=fps)
-        novfn = RNNBeatProcessor()(self.audio_file) # This step is the computational bottleneck
+        tmpfile = None
+        try:
+            novfn = RNNBeatProcessor()(self.audio_file)  # This step is the computational bottleneck
+        except:
+            filepath, ext = os.path.splitext(self.audio_file)
+            tmpfile = filepath + ".wav"
+            signal, fs = librosa.load(self.audio_file, sr=self.fs)
+            librosa.output.write_wav(tmpfile, signal, fs)
+            novfn = RNNBeatProcessor()(tmpfile)
+
         beats = beatproc(novfn)
         tempos = tempoproc(novfn)
-        onsets = np.array(np.round(beats*self.fs/float(self.hop_length)), dtype=np.int64)
-        # Resample the audio novelty function to correspond to the 
+        onsets = np.array(np.round(beats * self.fs / float(self.hop_length)), dtype=np.int64)
+        # Resample the audio novelty function to correspond to the
         # correct hop length
         nframes = len(self.librosa_noveltyfn(maxSize=maxSize))
-        novfn = np.interp(np.arange(nframes)*self.hop_length/float(self.fs), np.arange(len(novfn))/float(fps), novfn) 
-        
+        novfn = np.interp(np.arange(nframes) * self.hop_length / float(self.fs), np.arange(len(novfn)) / float(fps),
+                          novfn)
+
         # For good measure, also compute and return superflux
         sodf = SpectralOnsetProcessor(onset_method='superflux',
                                       fps=fps,
                                       filterbank=LogarithmicFilterbank,
                                       num_bands=nrbands,
                                       log=np.log10)
-        snovfn = sodf(self.audio_file)
+        try:
+            snovfn = sodf(self.audio_file)
+        except:
+            if os.path.exists(tmpfile):
+                snovfn = sodf(tmpfile)
+            else:
+                filepath, ext = os.path.splitext(self.audio_file)
+                tmpfile = filepath+ ".wav"
+                signal, fs = librosa.load(self.audio_file, sr=self.fs)
+                librosa.output.write_wav(tmpfile, signal, fs)
+                snovfn = sodf(tmpfile)
+
+        if os.path.exists(tmpfile):
+            os.remove(tmpfile)
         snovfn = np.interp(np.arange(nframes)*self.hop_length/float(self.fs), np.arange(len(snovfn))/float(fps), snovfn) 
         return {'tempos': tempos, 'onsets': onsets, 'novfn': novfn, 'snovfn': snovfn}
 

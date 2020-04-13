@@ -10,7 +10,7 @@ python extractors_ray.py -d '/mnt/Data/dirceusilva/development/libs/acoss-1/acos
 -a '/mnt/Data/dirceusilva/dados/ECAD/Covers10k/Audios/' \
 -p '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/features/' \
 -f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
--m 'parallel' -n 8 -r 0
+-m 'single' -n 1 -r 1
 
 
 #python extractors.py -d 'data/Covers10k_p.csv' \

@@ -113,23 +113,23 @@ def compute_features_from_list_file(input_txt_file, feature_dir, params=PROFILE)
                             suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
     for song in data:
         _LOG_FILE.info("Extracting features for %s " % song)
-        #try:
-        work_id = song.split('/')[-2]
-        work_dir = os.path.join(feature_dir, work_id+"/")
-        if not os.path.exists(work_dir):
-            os.makedirs(work_dir)
-        filename = work_dir + os.path.basename(song).replace(params['input_audio_format'], '') + '.h5'
+        try:
+            work_id = song.split('/')[-2]
+            work_dir = os.path.join(feature_dir, work_id+"/")
+            if not os.path.exists(work_dir):
+                os.makedirs(work_dir)
+            filename = work_dir + os.path.basename(song).replace(params['input_audio_format'], '') + '.h5'
 
-        # extract features
-        if params['overwrite'] or not os.path.exists(filename):
-            feature_dict = compute_features(audio_path=song, params=params)
+            # extract features
+            if params['overwrite'] or not os.path.exists(filename):
+                feature_dict = compute_features(audio_path=song, params=params)
 
-            #save as h5
-            dd.io.save(filename,feature_dict)
-        # except:
-        #     _ERRORS.append(input_txt_file)
-        #     _ERRORS.append(song)
-        #     _LOG_FILE.debug("Error: skipping computing features for audio file --%s-- " % song)
+                #save as h5
+                dd.io.save(filename,feature_dict)
+        except:
+            _ERRORS.append(input_txt_file)
+            _ERRORS.append(song)
+            _LOG_FILE.debug("Error: skipping computing features for audio file --%s-- " % song)
 
         if params['verbose'] >= 1:
             progress_bar.next()
@@ -186,7 +186,7 @@ def batch_feature_extractor(dataset_csv, audio_dir, feature_dir, batchesdir,  n_
         #                max=len(args),
         #                suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
         for cpath, fpath, param in args:
-            compute_features_from_list_file(cpath, fpath, param)
+            ray.get(compute_features_from_list_file.remote(cpath, fpath, param))
         #    progressbar.next()
         #progressbar.finish()
         _LOG_FILE.info("Single mode feature extraction finished in %s" % (time.monotonic() - tic))
