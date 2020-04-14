@@ -11,8 +11,8 @@
 #SBATCH --mail-user=dirceu.silva@co.it.pt
 #SBATCH --mail-type=ALL
 #SBATCH --time=1-00:00:00
-#SBATCH --output=/home/covers10k/dirceusilva/data/Covers10k/output.txt
-#SBATCH --error=/home/covers10k/dirceusilva/data/Covers10k/error.txt
+#SBATCH --output=/home/covers10k/dirceusilva/data/Covers10k_2/output4.txt
+#SBATCH --error=/home/covers10k/dirceusilva/data/Covers10k_2/error4.txt
 
 
 worker_num=15 # Must be one less that the total number of nodes
@@ -51,8 +51,8 @@ done
 
 #python -u extracton.py $redis_password 15 # Pass the total number of allocated CPUs
 
-python -u extractors_ray.py -d '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data/Covers10k_4.csv' \
--a '/home/covers10k/dirceusilva/data/Covers10k_2/' \
+python -u extractors_ray.py -d '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data/Covers10k_2_2.csv' \
+-a '/home/covers10k/dirceusilva/data/Covers10k_2/Audios/' \
 -p '/home/covers10k/dirceusilva/data/Covers10k_2/features/' \
 -b '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/batches_4/' \
 -f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \

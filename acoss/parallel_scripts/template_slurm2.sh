@@ -11,8 +11,8 @@
 #SBATCH --mail-user=dirceu.silva@co.it.pt
 #SBATCH --mail-type=ALL
 #SBATCH --time=1-00:00:00
-#SBATCH --output=/home/covers10k/dirceusilva/data/Covers10k/output.txt
-#SBATCH --error=/home/covers10k/dirceusilva/data/Covers10k/error.txt
+#SBATCH --output=/home/covers10k/dirceusilva/data/Covers10k/output2.txt
+#SBATCH --error=/home/covers10k/dirceusilva/data/Covers10k/error2.txt
 
 
 worker_num=15 # Must be one less that the total number of nodes
