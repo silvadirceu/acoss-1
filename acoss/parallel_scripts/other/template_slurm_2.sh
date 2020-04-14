@@ -7,7 +7,7 @@
 ##SBATCH --cpus-per-task=24
 #SBATCH --mem-per-cpu=3GB
 #SBATCH --nodes=16
-#SBATCH --tasks-per-node 1
+#SBATCH --tasks-per-node=1
 #SBATCH --mail-user=dirceu.silva@co.it.pt
 #SBATCH --mail-type=BEGIN|END|FAIL
 #SBATCH --time=1-00:00:00
