@@ -209,7 +209,7 @@ class AudioFeatures(object):
         try:
             snovfn = sodf(self.audio_file)
         except:
-            if os.path.exists(tmpfile):
+            if tmpfile and os.path.exists(tmpfile):
                 snovfn = sodf(tmpfile)
             else:
                 filepath, ext = os.path.splitext(self.audio_file)
@@ -218,7 +218,7 @@ class AudioFeatures(object):
                 librosa.output.write_wav(tmpfile, signal, fs)
                 snovfn = sodf(tmpfile)
 
-        if os.path.exists(tmpfile):
+        if tmpfile and os.path.exists(tmpfile):
             os.remove(tmpfile)
         snovfn = np.interp(np.arange(nframes)*self.hop_length/float(self.fs), np.arange(len(snovfn))/float(fps), snovfn) 
         return {'tempos': tempos, 'onsets': onsets, 'novfn': novfn, 'snovfn': snovfn}
