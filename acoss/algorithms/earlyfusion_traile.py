@@ -8,6 +8,7 @@ from .algorithm_template import CoverAlgorithm
 from .utils.alignment_tools import smith_waterman_constrained as alignment_fn
 from .utils.cross_recurrence import *
 from .utils.similarity_fusion import *
+from ..utils import split_list_in_CoversGroups
 
 __all__ = ['EarlyFusion']
 
@@ -41,7 +42,7 @@ class EarlyFusion(CoverAlgorithm):
     all_block_feats: dict
         A cache of features computed by load_features
     """
-    def __init__(self, dataset_csv, datapath, chroma_type='hpcp', shortname='Covers80', blocksize=20,
+    def __init__(self, dataset_csv, datapath, cache_dir='cache' ,chroma_type='hpcp', shortname='Covers80', blocksize=20,
                  mfccs_per_block=50, ssm_res=50, chromas_per_block=40, kappa=0.1, K=10, niters=5, log_times=False):
         self.chroma_type = chroma_type
         self.blocksize = blocksize
@@ -55,7 +56,8 @@ class EarlyFusion(CoverAlgorithm):
         if log_times:
             self.times = {'features': [], 'raw': []}
         CoverAlgorithm.__init__(self, dataset_csv=dataset_csv, name="EarlyFusionTraile", datapath=datapath,
-                                shortname=shortname, similarity_types=["mfccs", "ssms", "chromas", "early"])
+                                shortname=shortname, similarity_types=["mfccs", "ssms", "chromas", "early"],
+                                cachedir=cache_dir)
 
     def get_cacheprefix(self):
         """
@@ -64,7 +66,7 @@ class EarlyFusion(CoverAlgorithm):
         """
         return "%s/%s_%s_%s"%(self.cachedir, self.name, self.shortname, self.chroma_type)
 
-    def load_features(self, i, do_plot=False):
+    def load_features(self, i, do_plot=False, keep_features_in_memory=True):
         """
         Return a dictionary of all of the beat-synchronous blocked features
         Parameters
@@ -146,8 +148,9 @@ class EarlyFusion(CoverAlgorithm):
             d = ssm_fns[feat](block_feats[feat])
             block_feats['%s_W'%feat] = getW(d, self.K)
         """
+        if keep_features_in_memory:
+            self.all_block_feats[i] = block_feats # Cache features
 
-        self.all_block_feats[i] = block_feats # Cache features
         dd.io.save(filepath, block_feats)
         if self.log_times:
             self.times['features'].append(time.time()-tic)

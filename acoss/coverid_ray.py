@@ -1,0 +1,341 @@
+# -*- coding: utf-8 -*-
+"""
+Interface to run the various cover id algorithms for acoss benchmarking.
+"""
+import argparse
+import time
+import sys
+import os
+from shutil import rmtree
+
+from acoss.utils import log, read_txt_file, create_csv_cliques_batches, create_audio_path_batches, split_list_with_N_elements
+
+__all__ = ['benchmark', 'algorithm_names']
+
+_LOG_FILE_PATH = "acoss.coverid.log"
+_LOGGER = log(_LOG_FILE_PATH)
+
+# list the available cover song identification algorithms in acoss
+algorithm_names = ["Serra09", "EarlyFusionTraile", "LateFusionChen", "FTM2D", "SiMPle"]
+
+@ray.remote
+def compute_groups_from_list_file(input_txt_file,
+                                  feature_dir,
+                                  results_dir='../result',
+                                  algorithm='Serra09',
+                                  shortname='covers80',
+                                  chroma_type='hpcp',
+                                  verbose=0):
+    """
+    Compute specified audio features for a list of audio file paths and store to disk as .h5 file
+    from a given input text file.
+    It is a wrapper around 'compute_features'.
+
+    :param input_txt_file: a text file with a list of audio file paths
+    :param feature_dir: a path
+    :param params: dictionary of parameters for the extractor (refer 'extractor.PROFILE' for default params)
+
+    :return: None
+    """
+
+    start_time = time.monotonic()
+    _LOG_FILE.info("Extracting Batch File: %s " % input_txt_file)
+    data = read_txt_file(input_txt_file)
+    data = [path for path in data if os.path.exists(path)]
+    if len(data) < 1:
+        _LOG_FILE.debug("Empty collection txt file -%s- !" % input_txt_file)
+        raise IOError("Empty collection txt file -%s- !" % input_txt_file)
+
+    if verbose >= 1:
+        progress_bar = Bar('acoss.extractor.compute_features_from_list_file',
+                            max=len(data),
+                            suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
+    for csv in data:
+        shortname = os.path.splitext(os.path.basename(csv))[0]
+        results_path = os.path.join(results_dir,shortname)
+        _LOG_FILE.info("computing Similarity for %s " % csv)
+        try:
+            benchmark(csv,
+                      feature_dir,
+                      cache_dir=results_path,
+                      chroma_type=chroma_type,
+                      algorithm=algorithm,
+                      shortname=shortname,
+                      parallel=False,
+                      n_workers=1)
+
+            #save as h5
+            #dd.io.save(filename,feature_dict)
+        except:
+            _ERRORS.append(input_txt_file)
+            _ERRORS.append(song)
+            _LOG_FILE.debug("Error: skipping computing features for audio file --%s-- " % song)
+
+        if verbose >= 1:
+            progress_bar.next()
+
+    if verbose >= 1:
+        progress_bar.finish()
+
+    _LOG_FILE.info("Process finished in - %s - seconds" % (start_time - time.time()))
+
+
+def batch_groups(dataset_csv,
+                 feature_dir,
+                 results_dir,
+                 save_csv_dir,
+                 batchesdir,
+                 shortname='covers80',
+                 mode='parallel',
+                 algorithm="Serra09",
+                 chroma_type='hpcp',
+                 n_workers=-1):
+    """
+    Compute parallelised feature extraction process from a collection of input audio file path txt files
+
+    :param
+        dataset_csv: dataset csv file
+        audio_dir: path where the audio files are stored
+        feature_dir: path where the computed audio features should be stored
+        n_workers: no. of workers for parallelisation
+        mode: whether to run the extractor in 'single' or 'parallel' mode.
+        params: profile dict with params
+
+    :return: None
+    """
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+
+    batch_file_dir = batchesdir
+
+    create_csv_cliques_and_batches(dataset_csv, save_csv_dir, batchesdir, n_workers=n_workers)
+
+    collection_files = glob.glob(batch_file_dir + '*.txt')
+    _LOG_FILE.info("Computing batch feature extraction using '%s' mode \n" % (mode))
+
+    if mode == 'parallel':
+        music_groups = split_list_with_N_elements(collection_files,n_workers)
+
+        for cpaths in music_groups:
+            algorithm_id = ray.put(algorithm)
+            features_dir_id = ray.put(feature_dir)
+            chroma_type_id = ray.put(chroma_type)
+            results_dir_id = ray.put(results_dir)
+
+            ray.get([compute_groups_from_list_file.remote(cpath,features_dir_id, results_dir_id,algorithm_id,chroma_type_id) for cpath in cpaths])
+
+    elif mode == 'single':
+        tic = time.monotonic()
+        for cpath in collection_files:
+            algorithm_id = ray.put(algorithm)
+            features_dir_id = ray.put(feature_dir)
+            shortname_id = ray.put(shortname)
+            chroma_type_id = ray.put(chroma_type)
+            results_dir_id = ray.put(results_dir)
+
+            ray.get(compute_groups_from_list_file.remote(cpath,features_dir_id, results_dir_id,algorithm_id,shortname_id,chroma_type_id))
+
+        _LOG_FILE.info("Single mode feature extraction finished in %s" % (time.monotonic() - tic))
+    else:
+        raise IOError("Wrong value for the parameter 'mode'. Should be either 'single' or 'parallel'")
+    savelist_to_file(_ERRORS,'_erros_acoss.extractors.txt')
+    #rmtree(batch_file_dir)
+    _LOG_FILE.info("Log file located at '%s'" % _LOG_FILE_PATH)
+
+
+def benchmark(dataset_csv,
+              feature_dir,
+              cache_dir='cache',
+              chroma_type="hpcp",
+              algorithm="Serra09",
+              shortname="covers80",
+              parallel=True,
+              n_workers=-1):
+    """Benchmark a specific cover id algorithm with a given input dataset annotation csv file.
+    
+    Arguments:
+        dataset_csv {string} -- path to dataset csv annotation file
+        feature_dir {string} -- path to the directory where the pre-computed audio features are stored
+    
+    Keyword Arguments:
+        feature_type {str} -- type of audio feature you want to use for benchmarking. (default: {"hpcp"})
+        algorithm {str} -- name of the algorithm you want to benchmark (default: {"Serra09"})
+        shortname {str} -- description (default: {"DaTacos-Benchmark"})
+        parallel {bool} -- whether you want to run the benchmark process with parallel workers (default: {True})
+        n_workers {int} -- number of workers required. By default it uses as much workers available on the system. (default: {-1})
+    
+    Raises:
+        NotImplementedError: when an given algorithm method in not implemented in acoss.benchmark
+    """
+
+    if algorithm not in algorithm_names:
+        warn = ("acoss.coverid: Couldn't find '%s' algorithm in acoss \
+                                Available cover id algorithms are %s "
+                                % (algorithm, str(algorithm_names)))
+        _LOGGER.debug(warn)
+        raise NotImplementedError(warn)
+
+    _LOGGER.info("Running acoss cover identification benchmarking for the algorithm - '%s'" % algorithm)
+
+    start_time = time.monotonic()
+
+    if algorithm == "Serra09":
+        from .algorithms.rqa_serra09 import Serra09
+        # here run the algo
+        serra09 = Serra09(dataset_csv=dataset_csv,
+                          datapath=feature_dir,
+                          chroma_type=chroma_type,
+                          shortname=shortname)
+        _LOGGER.info('Computing pairwise similarity...')
+        serra09.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
+        serra09.normalize_by_length()
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+        for similarity_type in serra09.Ds.keys():
+            serra09.getEvalStatistics(similarity_type)
+        serra09.cleanup_memmap()
+
+    elif algorithm == "EarlyFusion":
+        from .algorithms.earlyfusion_traile import EarlyFusion
+
+        early_fusion = EarlyFusion.remote(dataset_csv=dataset_csv,
+                                   datapath=feature_dir,
+                                   chroma_type=chroma_type,
+                                   shortname=shortname)
+        _LOGGER.info('Feature loading done...')
+        for i in range(len(early_fusion.filepaths)):
+            early_fusion.load_features(i)
+
+        _LOGGER.info('Computing pairwise similarity...')
+        early_fusion.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
+        early_fusion.do_late_fusion()
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+        for similarity_type in early_fusion.Ds:
+            early_fusion.getEvalStatistics(similarity_type)
+        early_fusion.cleanup_memmap()
+
+    elif algorithm  == "LateFusionChen":
+        from .algorithms.latefusion_chen import ChenFusion
+
+        chenFusion = ChenFusion(dataset_csv=dataset_csv,
+                                datapath=feature_dir,
+                                chroma_type=chroma_type,
+                                shortname=shortname)
+        _LOGGER.info('Computing pairwise similarity...')
+        chenFusion.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
+        chenFusion.normalize_by_length()
+        chenFusion.do_late_fusion()
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+        for similarity_type in chenFusion.Ds.keys():
+            _LOGGER.info(similarity_type)
+            chenFusion.getEvalStatistics(similarity_type)
+        chenFusion.cleanup_memmap()
+
+    elif algorithm == "FTM2D":
+        from .algorithms.ftm2d import FTM2D
+
+        ftm2d = FTM2D(dataset_csv=dataset_csv,
+                      datapath=feature_dir,
+                      chroma_type=chroma_type,
+                      shortname=shortname)
+        for i in range(len(ftm2d.filepaths)):
+            ftm2d.load_features(i)
+        _LOGGER.info('Feature loading done...')
+        _LOGGER.info('Computing pairwise similarity...')
+        ftm2d.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+        for similarity_type in ftm2d.Ds.keys():
+            ftm2d.getEvalStatistics(similarity_type)
+        ftm2d.cleanup_memmap()
+
+    elif algorithm == "SiMPle":
+        from .algorithms.simple_silva import Simple
+
+        simple = Simple(dataset_csv=dataset_csv,
+                        datapath=feature_dir,
+                        chroma_type=chroma_type,
+                        shortname=shortname)
+        for i in range(len(simple.filepaths)):
+            simple.load_features(i)
+        _LOGGER.info('Feature loading done...')
+        _LOGGER.info('Computing pairwise similarity...')
+        simple.all_pairwise(parallel, n_cores=n_workers, symmetric=False)
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+        for similarity_type in simple.Ds.keys():
+            simple.getEvalStatistics(similarity_type)
+        simple.cleanup_memmap()
+
+    _LOGGER.info("acoss.coverid benchmarking finsihed in %s" % (time.monotonic() - start_time))
+    _LOGGER.info("Log file located at '%s'" % _LOG_FILE_PATH)
+
+
+def parser_args(cmd_args):
+
+    parser = argparse.ArgumentParser(sys.argv[0], description="Benchmark a specific cover id algorithm with a given"
+                                                              "input dataset csv annotations",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("-i", '--dataset_csv', type=str, action="store",
+                        help="Input dataset csv file")
+    parser.add_argument("-d", '--feature_dir', type=str, action="store", default='../features_covers80',
+                        help="Path to data files")
+    parser.add_argument("-r", '--results_dir', type=str, action="store", default='../results',
+                        help="Path to results files")
+    parser.add_argument("-v", '--csv_dir', type=str, action="store", default='../csv',
+                        help="Path to csv temporary files")
+    parser.add_argument("-b", '--batches_dir', type=str, action="store", default='../batches',
+                        help="Path to batch temporary files")
+    parser.add_argument("-s", "--shortname", type=str, action="store", default="covers80",
+                        help="Short name for dataset")
+    parser.add_argument("-a", "--algorithm", type=str, action="store", default="Serra09",
+                        help="Algorithm to use")
+    parser.add_argument("-c", '--chroma_type', type=str, action="store", default="hpcp",
+                        help="Type of chroma to use for experiments")
+    parser.add_argument("-p", '--parallel', type=int, choices=(0, 1), action="store", default=1,
+                        help="Parallel computing or not")
+    parser.add_argument("-n", '--n_workers', type=int, action="store", default=-1,
+                        help="No of workers required for parallelization")
+    parser.add_argument("-t", "--type_cluster", action="store", type=int, default=0,
+                        help="Cluster type to use (0 - without cluster, 1 - Slurm) - default 0.")
+
+
+    return parser.parse_args(cmd_args)
+
+
+if __name__ == '__main__':
+
+    args = parser_args(sys.argv[1:])
+
+    # Start Ray
+    useRay = True
+
+    num_cpus = args.n_workers
+    if cmd_args.workers == -1:
+        num_cpus = psutil.cpu_count(logical=False)
+
+    print("Nr CPUs: %d" % num_cpus)
+    if useRay:
+        if cmd_args.type_cluster == 1:  # Slurm Cluster Configuration
+            ray.init(address=os.environ["ip_head"],
+                     redis_password=cmd_args.redis_password)  # 1 GB
+        else:
+            ray.init(num_cpus=num_cpus)
+
+    if useRay or args.type_cluster == 1:
+
+        batch_groups(dataset_csv=args.dataset_csv,
+                     feature_dir=args.feature_dir,
+                     results_dir=args.results_dir,
+                     save_csv_dir=args.csv_dir,
+                     batchesdir=args.batches_dir,
+                     shortname=args.shortname,
+                     mode=args.parallel,
+                     algorithm=args.algorithm,
+                     chroma_type=args.chroma_type,
+                     n_workers=num_cpus)
+    else:
+        benchmark(dataset_csv=args.dataset_csv,
+                  feature_dir=args.feature_dir,
+                  chroma_type=args.chroma_type,
+                  algorithm=args.algorithm,
+                  shortname=args.shortname,
+                  parallel=bool(args.parallel),
+                  n_workers=args.n_workers)

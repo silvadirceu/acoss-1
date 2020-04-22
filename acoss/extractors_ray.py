@@ -73,6 +73,7 @@ def compute_features(audio_path, params=PROFILE):
     out_dict = dict()
     # now we compute all the listed features in the profile dict and store the results to a output dictionary
     for method in params['features']:
+        _LOG_FILE.info("Extracting features: %s " % params['features'])
         out_dict[method] = getattr(feature, method)(params=params[method])
 
     track_id = os.path.basename(audio_path).replace(params['input_audio_format'], '')
@@ -241,18 +242,6 @@ if __name__ == '__main__':
     updated_profile['verbose'] = cmd_args.verbose
     updated_profile['overwrite'] = bool(cmd_args.overwrite)
 
-    # Start Ray
-    num_cpus = cmd_args.workers
-    print("Nr CPUs: %d" % num_cpus)
-
-    if cmd_args.type_cluster == 1: # Slurm Cluster Configuration
-        ray.init(address=os.environ["ip_head"],
-                 redis_password=cmd_args.redis_password) # 1 GB
-    else: # Use Ray in PC
-        if cmd_args.workers == -1:
-            num_cpus = psutil.cpu_count(logical=False)
-
-        ray.init(num_cpus=num_cpus)
 
     batch_feature_extractor(dataset_csv=cmd_args.dataset_csv,
                             audio_dir=cmd_args.audio_dir,

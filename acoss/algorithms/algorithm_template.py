@@ -139,7 +139,7 @@ class CoverAlgorithm(object):
             score = 0.0
             self.Ds["main"][i, j] = score
     
-    def all_pairwise(self, parallel=0, n_cores=12, symmetric=False, precomputed=False):
+    def all_pairwise(self, parallel=0, n_cores=12, symmetric=False, precomputed=False, verbose=True):
         """
         Do all pairwise comparisons between songs, with code that is 
         amenable to parallelizations.
@@ -177,19 +177,23 @@ class CoverAlgorithm(object):
                     delayed(self.similarity)(chunks[i]) for i in range(len(chunks)))
                 self.get_all_clique_ids() # Since nothing has been cached
             else:
-                progressbar = Bar('Running pairwise between all combinations of query and reference song', 
-                                max=len(all_pairs) + len(self.Ds) , 
-                                suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
+                if verbose:
+                    progressbar = Bar('Running pairwise between all combinations of query and reference song',
+                                    max=len(all_pairs) + len(self.Ds) ,
+                                    suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
                 for idx, (i, j) in enumerate(all_pairs):
                     self.similarity(np.array([[i, j]]))
-                    if idx % 100 == 0:
-                        print((i, j))
-                    progressbar.next()
+                    if verbose:
+                        if idx % 100 == 0:
+                            print((i, j))
+                        progressbar.next()
             if symmetric:
                 for similarity_type in self.Ds:
                     self.Ds[similarity_type] += self.Ds[similarity_type].T
-                    progressbar.next()
-            progressbar.finish()
+                    if verbose:
+                        progressbar.next()
+            if verbose:
+                progressbar.finish()
             dd.io.save(h5filename, self.Ds)    
 
     def cleanup_memmap(self):

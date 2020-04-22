@@ -87,6 +87,43 @@ def create_audio_path_batches(dataset_csv, dir_to_save, root_audio_dir="./", aud
         savelist_to_file(chunk, dir_to_save + str(idx) + '_batch.txt')
 
 
+def create_csv_cliques_and_batches(dataset_csv, dir_save_csv, batches_dir, n_workers=None):
+    """Create csv files to each Covers groups """
+
+    if not os.path.exists(dir_save_csv):
+        os.mkdir(dir_save_csv)
+    elif reset:
+        rmtree(dir_save_csv)
+
+    allcliques = pd.read_csv(dataset_csv, encoding="ISO-8859-1", dtype=str)
+    aftergrouping_cliques = allcliques.groupby("work_id")
+    data_paths = []
+
+    for name, group in aftergrouping_cliques:
+        filesave = os.path.join(dir_save_csv, name + '.csv')
+        group.to_csv(filesave, index=False)
+        data_paths.append(filesave)
+
+    if not os.path.exists(batches_dir):
+        os.mkdir(batches_dir)
+    elif reset:
+        rmtree(batches_dir)
+
+    if n_workers:
+        batch_size = min(n_workers,len(data_paths))
+    else:
+        batch_size = len(data_paths)
+
+    for path in data_paths:
+        if not os.path.exists(path):
+            raise Exception(".. Invalid audio filepath -- %s -- found in the collection file" % path)
+    if batch_size > len(data_paths):
+        raise UserWarning("Batch size shouldn't be greater than the size of audio file")
+    song_chunks = np.array_split(data_paths, batch_size)
+    for idx, chunk in enumerate(song_chunks):
+        savelist_to_file(chunk, batches_dir + str(idx) + '_batch.txt')
+
+
 def create_dataset_filepaths(dataset_csv, root_audio_dir, file_format=".mp3"):
     """Constructs audio file paths from dataset csv annotation.
     eg: For a csv file with two columns `work_id, track_id`
@@ -140,6 +177,36 @@ def split_list_with_N_elements(seq,n):
 
     newlist = [seq[i * n:(i + 1) * n] for i in range((len(seq) + n - 1) // n )]
     return newlist
+
+def get_index_split_list_with_N_elements(seq,n):
+    #spli a list in sublists with n elements + the reminder
+
+    newlist = [seq[i * n:(i + 1) * n] for i in range((len(seq) + n - 1) // n )]
+    return newlist
+
+
+
+def split_list_in_CoversGroups(filepaths):
+    """
+    Get the row and column index ranges of blocks in an
+    all pairs of the same clique similarity experiment between N songs
+    :param filepaths: The list of songs, with their path name as an identifier of a clique
+    :returns ranges: An array of ranges [[starti, endi, startj, endj]]
+    	comprising each block.
+    """
+    ranges = []
+    n_cn = ""
+    i1 = i2 = 0
+    for fname in allFiles:
+        cn = fname.split("/")[-2]
+        if cn != n_cn:
+            if n_cn != "":
+                ranges.append([i1, i2])
+            i1 = i2
+            n_cn = cn
+        i2 += 1
+    ranges.append([i1, i2])
+    return ranges
 
 
 def split_list_in_N_parts(seq, n):
