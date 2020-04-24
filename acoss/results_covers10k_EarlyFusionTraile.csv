@@ -1,0 +1,13 @@
+name, MR, MRR, MDR, MAP,Top-1,Top-10,Top-100,Top-1000
+EarlyFusionTraile_early,1, 1, 1, 1, 16, 16, 16, 16
+EarlyFusionTraile_early+late,1, 1, 1, 1, 16, 16, 16, 16
+EarlyFusionTraile_late,1, 1, 1, 1, 16, 16, 16, 16
+EarlyFusionTraile_ssms,1, 1, 1, 1, 16, 16, 16, 16
+EarlyFusionTraile_mfccs,1, 1, 1, 1, 16, 16, 16, 16
+EarlyFusionTraile_chromas,1, 1, 1, 1, 16, 16, 16, 16
+EarlyFusionTraile_early,1.24, 0.925, 1, 0.753, 37, 42, 42, 42
+EarlyFusionTraile_late,1.19, 0.952, 1, 0.889, 39, 42, 42, 42
+EarlyFusionTraile_chromas,1.4, 0.913, 1, 0.741, 37, 42, 42, 42
+EarlyFusionTraile_mfccs,1.21, 0.939, 1, 0.587, 38, 42, 42, 42
+EarlyFusionTraile_ssms,1.14, 0.946, 1, 0.746, 38, 42, 42, 42
+EarlyFusionTraile_early+late,1.4, 0.932, 1, 0.886, 38, 41, 42, 42

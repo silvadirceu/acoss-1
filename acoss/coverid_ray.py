@@ -7,13 +7,18 @@ import time
 import sys
 import os
 from shutil import rmtree
+import ray
+from progress.bar import Bar
+import psutil
+import glob
 
-from acoss.utils import log, read_txt_file, create_csv_cliques_batches, create_audio_path_batches, split_list_with_N_elements
+from acoss.utils import log, read_txt_file, create_csv_cliques_and_batches, savelist_to_file, split_list_with_N_elements
 
 __all__ = ['benchmark', 'algorithm_names']
 
 _LOG_FILE_PATH = "acoss.coverid.log"
 _LOGGER = log(_LOG_FILE_PATH)
+_ERRORS = list()
 
 # list the available cover song identification algorithms in acoss
 algorithm_names = ["Serra09", "EarlyFusionTraile", "LateFusionChen", "FTM2D", "SiMPle"]
@@ -39,37 +44,37 @@ def compute_groups_from_list_file(input_txt_file,
     """
 
     start_time = time.monotonic()
-    _LOG_FILE.info("Extracting Batch File: %s " % input_txt_file)
+    _LOGGER.info("Extracting Batch File: %s " % input_txt_file)
     data = read_txt_file(input_txt_file)
     data = [path for path in data if os.path.exists(path)]
     if len(data) < 1:
-        _LOG_FILE.debug("Empty collection txt file -%s- !" % input_txt_file)
+        _LOGGER.debug("Empty collection txt file -%s- !" % input_txt_file)
         raise IOError("Empty collection txt file -%s- !" % input_txt_file)
 
     if verbose >= 1:
-        progress_bar = Bar('acoss.extractor.compute_features_from_list_file',
+        progress_bar = Bar('acoss.coverid_ray.compute_groups_from_list_file',
                             max=len(data),
                             suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
     for csv in data:
         shortname = os.path.splitext(os.path.basename(csv))[0]
         results_path = os.path.join(results_dir,shortname)
-        _LOG_FILE.info("computing Similarity for %s " % csv)
-        try:
-            benchmark(csv,
-                      feature_dir,
-                      cache_dir=results_path,
-                      chroma_type=chroma_type,
-                      algorithm=algorithm,
-                      shortname=shortname,
-                      parallel=False,
-                      n_workers=1)
+        _LOGGER.info("computing Similarity for %s " % csv)
+        #try:
+        benchmark(csv,
+                  feature_dir,
+                  cache_dir=results_path,
+                  chroma_type=chroma_type,
+                  algorithm=algorithm,
+                  shortname=shortname,
+                  parallel=False,
+                  n_workers=1)
 
             #save as h5
             #dd.io.save(filename,feature_dict)
-        except:
-            _ERRORS.append(input_txt_file)
-            _ERRORS.append(song)
-            _LOG_FILE.debug("Error: skipping computing features for audio file --%s-- " % song)
+        # except:
+        #     _ERRORS.append(input_txt_file)
+        #     _ERRORS.append(csv)
+        #     _LOGGER.debug("Error: skipping computing features for audio file --%s-- " % csv)
 
         if verbose >= 1:
             progress_bar.next()
@@ -77,7 +82,7 @@ def compute_groups_from_list_file(input_txt_file,
     if verbose >= 1:
         progress_bar.finish()
 
-    _LOG_FILE.info("Process finished in - %s - seconds" % (start_time - time.time()))
+    _LOGGER.info("Process finished in - %s - seconds" % (start_time - time.time()))
 
 
 def batch_groups(dataset_csv,
@@ -111,12 +116,15 @@ def batch_groups(dataset_csv,
     create_csv_cliques_and_batches(dataset_csv, save_csv_dir, batchesdir, n_workers=n_workers)
 
     collection_files = glob.glob(batch_file_dir + '*.txt')
-    _LOG_FILE.info("Computing batch feature extraction using '%s' mode \n" % (mode))
+    _LOGGER.info("Computing batch similarity using '%s' mode \n" % (mode))
+    print(collection_files)
 
-    if mode == 'parallel':
+    if mode == 1:
         music_groups = split_list_with_N_elements(collection_files,n_workers)
+        print(music_groups)
 
         for cpaths in music_groups:
+            _LOGGER.info("Computing similarity using Ray '%s' \n" % (cpaths))
             algorithm_id = ray.put(algorithm)
             features_dir_id = ray.put(feature_dir)
             chroma_type_id = ray.put(chroma_type)
@@ -124,7 +132,7 @@ def batch_groups(dataset_csv,
 
             ray.get([compute_groups_from_list_file.remote(cpath,features_dir_id, results_dir_id,algorithm_id,chroma_type_id) for cpath in cpaths])
 
-    elif mode == 'single':
+    elif mode == 0:
         tic = time.monotonic()
         for cpath in collection_files:
             algorithm_id = ray.put(algorithm)
@@ -135,12 +143,12 @@ def batch_groups(dataset_csv,
 
             ray.get(compute_groups_from_list_file.remote(cpath,features_dir_id, results_dir_id,algorithm_id,shortname_id,chroma_type_id))
 
-        _LOG_FILE.info("Single mode feature extraction finished in %s" % (time.monotonic() - tic))
+        _LOGGER.info("Single mode similarity finished in %s" % (time.monotonic() - tic))
     else:
         raise IOError("Wrong value for the parameter 'mode'. Should be either 'single' or 'parallel'")
-    savelist_to_file(_ERRORS,'_erros_acoss.extractors.txt')
+    savelist_to_file(_ERRORS,'_erros_acoss.coversid.txt')
     #rmtree(batch_file_dir)
-    _LOG_FILE.info("Log file located at '%s'" % _LOG_FILE_PATH)
+    _LOGGER.info("Log file located at '%s'" % _LOG_FILE_PATH)
 
 
 def benchmark(dataset_csv,
@@ -194,13 +202,15 @@ def benchmark(dataset_csv,
             serra09.getEvalStatistics(similarity_type)
         serra09.cleanup_memmap()
 
-    elif algorithm == "EarlyFusion":
-        from .algorithms.earlyfusion_traile import EarlyFusion
-
-        early_fusion = EarlyFusion.remote(dataset_csv=dataset_csv,
+    elif algorithm == "EarlyFusionTraile":
+        from acoss.algorithms.earlyfusion_traile import EarlyFusion
+        _LOGGER.info('Starting EarlyFusionTraile...')
+        early_fusion = EarlyFusion(dataset_csv=dataset_csv,
                                    datapath=feature_dir,
+                                   cache_dir=cache_dir,
                                    chroma_type=chroma_type,
-                                   shortname=shortname)
+                                   shortname=shortname,
+                                   K=10)
         _LOGGER.info('Feature loading done...')
         for i in range(len(early_fusion.filepaths)):
             early_fusion.load_features(i)
@@ -221,7 +231,7 @@ def benchmark(dataset_csv,
                                 chroma_type=chroma_type,
                                 shortname=shortname)
         _LOGGER.info('Computing pairwise similarity...')
-        chenFusion.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
+        chenFusion.all_pairwise(parallel, n_cores=n_workers, symmetric=True, verbose=False)
         chenFusion.normalize_by_length()
         chenFusion.do_late_fusion()
         _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
@@ -295,7 +305,8 @@ def parser_args(cmd_args):
                         help="No of workers required for parallelization")
     parser.add_argument("-t", "--type_cluster", action="store", type=int, default=0,
                         help="Cluster type to use (0 - without cluster, 1 - Slurm) - default 0.")
-
+    parser.add_argument("-w", "--redis_password", action="store", type=str, default="",
+                        help="Cluster redisPassword - generated by slurm script.")
 
     return parser.parse_args(cmd_args)
 
@@ -304,18 +315,30 @@ if __name__ == '__main__':
 
     args = parser_args(sys.argv[1:])
 
+    # args.dataset_csv = 'data/Covers10k_p2.csv'
+    # args.feature_dir='/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/features/'
+    # args.results_dir='/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/results/'
+    # args.csv_dir='/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/csv/'
+    # args.batches_dir='/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/batches/'
+    # args.algorithm='EarlyFusionTraile'
+    # args.chroma_type='hpcp'
+    # args.parallel=0
+    # args.n_workers=8
+    # args.type_cluster=0
+    # args.shortname="covers10k"
+
     # Start Ray
-    useRay = True
+    useRay = False
 
     num_cpus = args.n_workers
-    if cmd_args.workers == -1:
+    if args.n_workers == -1:
         num_cpus = psutil.cpu_count(logical=False)
 
     print("Nr CPUs: %d" % num_cpus)
     if useRay:
-        if cmd_args.type_cluster == 1:  # Slurm Cluster Configuration
+        if args.type_cluster == 1:  # Slurm Cluster Configuration
             ray.init(address=os.environ["ip_head"],
-                     redis_password=cmd_args.redis_password)  # 1 GB
+                     redis_password=args.redis_password)  # 1 GB
         else:
             ray.init(num_cpus=num_cpus)
 

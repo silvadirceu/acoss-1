@@ -8,7 +8,6 @@ from .algorithm_template import CoverAlgorithm
 from .utils.alignment_tools import smith_waterman_constrained as alignment_fn
 from .utils.cross_recurrence import *
 from .utils.similarity_fusion import *
-from ..utils import split_list_in_CoversGroups
 
 __all__ = ['EarlyFusion']
 
@@ -108,7 +107,12 @@ class EarlyFusion(CoverAlgorithm):
 
         onsets = feats['madmom_features']['onsets']
         n_beats = len(onsets)
-        n_blocks = n_beats - self.blocksize
+
+        blocksize = self.blocksize
+        if n_beats <= self.blocksize:     # change blocksize if NBeats  < bloscksize
+            blocksize = n_beats - n_beats%5
+
+        n_blocks = n_beats - blocksize
 
         ## Step 1: Compute raw MFCC and MFCC SSM blocked features
         # Allocate space for MFCC-based features
@@ -120,7 +124,7 @@ class EarlyFusion(CoverAlgorithm):
         # Compute MFCC-based features
         for b in range(n_blocks):
             i1 = onsets[b]
-            i2 = onsets[b+self.blocksize-1]
+            i2 = onsets[b+blocksize-1]
             x = resize_block(mfcc, i1, i2, self.mfccs_per_block)
             # Z-normalize
             x -= np.mean(x, 0)[None, :]
@@ -132,12 +136,13 @@ class EarlyFusion(CoverAlgorithm):
             D = get_ssm(xn)
             block_feats['ssms'][b, :] = D[I < J] # Upper triangular part
 
+
         ## Step 2: Compute chroma blocks
         block_feats['chromas'] = np.zeros((n_blocks, self.chromas_per_block*chroma.shape[1]), dtype=np.float32)
         block_feats['chroma_med'] = np.median(chroma, axis=0)
         for b in range(n_blocks):
             i1 = onsets[b]
-            i2 = onsets[b+self.blocksize]
+            i2 = onsets[b+blocksize]
             x = resize_block(chroma, i1, i2, self.chromas_per_block)
             block_feats['chromas'][b, :] = x.flatten()
 
@@ -159,7 +164,6 @@ class EarlyFusion(CoverAlgorithm):
 
     def similarity(self, idxs, do_plot=False):
         for i, j in zip(idxs[:, 0], idxs[:, 1]):
-            print(i, j)
             feats1 = self.load_features(i)
             feats2 = self.load_features(j)
             ## Step 1: Create all of the parent SSMs
@@ -170,11 +174,10 @@ class EarlyFusion(CoverAlgorithm):
             CSMs['mfccs'] = get_csm(feats1['mfccs'], feats2['mfccs'])
             scores['mfccs'] = alignment_fn(csm_to_binary(CSMs['mfccs'], self.kappa))
             CSMs['ssms'] = get_csm(feats1['ssms'], feats2['ssms'])
-   
             scores['ssms'] = alignment_fn(csm_to_binary(CSMs['ssms'], self.kappa))
-            CSMs['chromas'] = get_csm_blocked_oti(feats1['chromas'], feats2['chromas'], \
-                                                        feats1['chroma_med'], feats2['chroma_med'],\
-                                                        get_csm_cosine)
+            CSMs['chromas'] = get_csm_blocked_oti(feats1['chromas'], feats2['chromas'],
+                                                  feats1['chroma_med'], feats2['chroma_med'],
+                                                  get_csm_cosine)
             scores['chromas'] = alignment_fn(csm_to_binary(CSMs['chromas'], self.kappa))
 
             ## Step 2: Compute Ws for each CSM
@@ -205,8 +208,8 @@ class EarlyFusion(CoverAlgorithm):
         Perform late fusion after all different pairwise similarity scores
         have been computed
         """
-        self.Ds["late"] = doSimilarityFusion([1.0/(1.0+self.Ds[s]) for s in ["chromas", "ssms", "mfccs"]], K=20, niters=20, reg_diag=1)[1]
-        self.Ds["early+late"] = doSimilarityFusion([1.0/(1.0+self.Ds[s]) for s in ["chromas", "ssms", "mfccs", "early"]], K=20, niters=20, reg_diag=1)[1]
+        self.Ds["late"] = doSimilarityFusion([1.0/(1.0+self.Ds[s]) for s in ["chromas", "ssms", "mfccs"]], K=self.K, niters=20, reg_diag=1)[1]
+        self.Ds["early+late"] = doSimilarityFusion([1.0/(1.0+self.Ds[s]) for s in ["chromas", "ssms", "mfccs", "early"]], K=self.K, niters=20, reg_diag=1)[1]
 
 
 """====================================================

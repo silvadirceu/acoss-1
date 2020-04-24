@@ -87,7 +87,7 @@ def create_audio_path_batches(dataset_csv, dir_to_save, root_audio_dir="./", aud
         savelist_to_file(chunk, dir_to_save + str(idx) + '_batch.txt')
 
 
-def create_csv_cliques_and_batches(dataset_csv, dir_save_csv, batches_dir, n_workers=None):
+def create_csv_cliques_and_batches(dataset_csv, dir_save_csv, batches_dir, n_workers=None, reset=False):
     """Create csv files to each Covers groups """
 
     if not os.path.exists(dir_save_csv):
@@ -177,37 +177,6 @@ def split_list_with_N_elements(seq,n):
 
     newlist = [seq[i * n:(i + 1) * n] for i in range((len(seq) + n - 1) // n )]
     return newlist
-
-def get_index_split_list_with_N_elements(seq,n):
-    #spli a list in sublists with n elements + the reminder
-
-    newlist = [seq[i * n:(i + 1) * n] for i in range((len(seq) + n - 1) // n )]
-    return newlist
-
-
-
-def split_list_in_CoversGroups(filepaths):
-    """
-    Get the row and column index ranges of blocks in an
-    all pairs of the same clique similarity experiment between N songs
-    :param filepaths: The list of songs, with their path name as an identifier of a clique
-    :returns ranges: An array of ranges [[starti, endi, startj, endj]]
-    	comprising each block.
-    """
-    ranges = []
-    n_cn = ""
-    i1 = i2 = 0
-    for fname in allFiles:
-        cn = fname.split("/")[-2]
-        if cn != n_cn:
-            if n_cn != "":
-                ranges.append([i1, i2])
-            i1 = i2
-            n_cn = cn
-        i2 += 1
-    ranges.append([i1, i2])
-    return ranges
-
 
 def split_list_in_N_parts(seq, n):
     # split a list in N parts + the reminder

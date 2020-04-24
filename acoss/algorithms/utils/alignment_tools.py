@@ -4,7 +4,7 @@ from numba import jit
 
 __all__ = ['smith_waterman_constrained']
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def delta_func(value_a, value_b, gap_opening=-0.5, gap_extension=-0.7):
     if value_a > 0:
         return 0
@@ -13,7 +13,7 @@ def delta_func(value_a, value_b, gap_opening=-0.5, gap_extension=-0.7):
     else:
         return gap_extension
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def match(value, match_score=1, mismatch_score=-1):
     if value == 0:
         return mismatch_score
@@ -22,7 +22,7 @@ def match(value, match_score=1, mismatch_score=-1):
     else:
         raise IOError("Non-binary elements found in input")
 
-@jit(nopython=True)
+#@jit(nopython=True)
 def smith_waterman_constrained(input_matrix):
     """
     https://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm

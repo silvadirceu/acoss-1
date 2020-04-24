@@ -242,6 +242,17 @@ if __name__ == '__main__':
     updated_profile['verbose'] = cmd_args.verbose
     updated_profile['overwrite'] = bool(cmd_args.overwrite)
 
+    num_cpus = cmd_args.n_workers
+    if cmd_args.n_workers == -1:
+        num_cpus = psutil.cpu_count(logical=False)
+
+    print("Nr CPUs: %d" % num_cpus)
+
+    if cmd_args.type_cluster == 1:  # Slurm Cluster Configuration
+        ray.init(address=os.environ["ip_head"],
+                 redis_password=cmd_args.redis_password)  # 1 GB
+    else:
+        ray.init(num_cpus=num_cpus)
 
     batch_feature_extractor(dataset_csv=cmd_args.dataset_csv,
                             audio_dir=cmd_args.audio_dir,

@@ -106,7 +106,6 @@ class CoverAlgorithm(object):
                 feats = CoverAlgorithm.load_features(self, i)
                 if verbose:
                     print(i)
-                print(feats['label'])
                 fout.write("%i,%s\n"%(i, feats['label']))
             fout.close()
         else:
@@ -161,6 +160,8 @@ class CoverAlgorithm(object):
         """
         from itertools import combinations, permutations
         h5filename = "%s_Ds.h5" % self.get_cacheprefix()
+        progressbar = None
+
         if precomputed:
             self.Ds = dd.io.load(h5filename)
             self.get_all_clique_ids()
@@ -177,22 +178,23 @@ class CoverAlgorithm(object):
                     delayed(self.similarity)(chunks[i]) for i in range(len(chunks)))
                 self.get_all_clique_ids() # Since nothing has been cached
             else:
+
                 if verbose:
                     progressbar = Bar('Running pairwise between all combinations of query and reference song',
                                     max=len(all_pairs) + len(self.Ds) ,
                                     suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
                 for idx, (i, j) in enumerate(all_pairs):
                     self.similarity(np.array([[i, j]]))
-                    if verbose:
+                    if progressbar is not None and verbose:
                         if idx % 100 == 0:
                             print((i, j))
                         progressbar.next()
             if symmetric:
                 for similarity_type in self.Ds:
                     self.Ds[similarity_type] += self.Ds[similarity_type].T
-                    if verbose:
-                        progressbar.next()
-            if verbose:
+                    #if verbose:
+                    #    progressbar.next()
+            if progressbar is not None and verbose:
                 progressbar.finish()
             dd.io.save(h5filename, self.Ds)    
 
@@ -266,7 +268,6 @@ class CoverAlgorithm(object):
             AllMap[i] = np.mean(P)
         MAP = np.nanmean(AllMap)
         ranks = ranks[np.isnan(ranks) == 0]
-        print(ranks)
         MR = np.mean(ranks)
         MRR = 1.0/N*(np.sum(1.0/ranks))
         MDR = np.median(ranks)

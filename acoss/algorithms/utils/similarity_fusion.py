@@ -192,6 +192,7 @@ def doSimilarityFusion(Scores, K = 5, niters = 5, reg_diag = 1):
     :returns (An array of similarity matrices for each feature, Fused Similarity Matrix)
     """
     #Affinity matrices
+
     Ws = [getW(D, K) for D in Scores]
     return (Ws, doSimilarityFusionWs(Ws, K, niters, reg_diag))
 

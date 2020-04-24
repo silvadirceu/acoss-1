@@ -32,7 +32,7 @@ pyenv uninstall -f acoss
 pyenv virtualenv 3.5.9 acoss
 pyenv activate acoss
 
-pip install numpy==1.16.5 cython  tensorflow==1.13.1 keras==2.2.4 tables ray psutil
+pip install numpy==1.16.5 cython  tensorflow==1.13.1 keras==2.2.4 tables ray psutil scikit-image
 pip install numba==0.43.0 pandas==0.25.3 scipy==1.2.1 scikit-learn==0.19.2 deepdish>=0.3.6 progress>=1.5
 
 #git clone https://github.com/silvadirceu/acoss-1.git
