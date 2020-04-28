@@ -65,6 +65,13 @@ class EarlyFusion(CoverAlgorithm):
         """
         return "%s/%s_%s_%s"%(self.cachedir, self.name, self.shortname, self.chroma_type)
 
+
+    def load_features_parallel(self, n_cores=8, keep_features_in_memory=True):
+
+        from joblib import Parallel, delayed
+        Parallel(n_jobs=n_cores, verbose=1)(
+            delayed(self.load_features)(i,keep_features_in_memory=False) for i in range(len(self.filepaths)))
+
     def load_features(self, i, do_plot=False, keep_features_in_memory=True):
         """
         Return a dictionary of all of the beat-synchronous blocked features
@@ -94,10 +101,11 @@ class EarlyFusion(CoverAlgorithm):
         elif os.path.exists(filepath):
             # If the result has already been cached on disk,
             # load it, save it in memory, and return
-            self.all_block_feats[i] = dd.io.load(filepath)
+            #self.all_block_feats[i] = dd.io.load(filepath)
+            block_feats = dd.io.load(filepath)
             # Make sure to also load clique info as a side effect
             feats = CoverAlgorithm.load_features(self, i)
-            return self.all_block_feats[i]
+            return block_feats #self.all_block_feats[i]
         tic = time.time()
         block_feats = {}
         feats = CoverAlgorithm.load_features(self, i)

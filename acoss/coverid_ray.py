@@ -212,8 +212,11 @@ def benchmark(dataset_csv,
                                    shortname=shortname,
                                    K=10)
         _LOGGER.info('Feature loading done...')
-        for i in range(len(early_fusion.filepaths)):
-            early_fusion.load_features(i)
+        if parallel:
+            early_fusion.load_features_parallel(n_cores=n_workers)
+        else:
+            for i in range(len(early_fusion.filepaths)):
+                early_fusion.load_features(i,keep_features_in_memory=False)
 
         _LOGGER.info('Computing pairwise similarity...')
         early_fusion.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
