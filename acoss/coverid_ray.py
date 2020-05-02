@@ -11,8 +11,11 @@ import ray
 from progress.bar import Bar
 import psutil
 import glob
+import numpy as np
 
-from acoss.utils import log, read_txt_file, create_csv_cliques_and_batches, savelist_to_file, split_list_with_N_elements
+from acoss.utils import (log, read_txt_file, create_csv_cliques_and_batches, savelist_to_file,
+                         split_list_with_N_elements, create_dataset_filepaths)
+from acoss.algorithms.algorithm_template import CoverAlgorithm
 
 __all__ = ['benchmark', 'algorithm_names']
 
@@ -22,6 +25,8 @@ _ERRORS = list()
 
 # list the available cover song identification algorithms in acoss
 algorithm_names = ["Serra09", "EarlyFusionTraile", "LateFusionChen", "FTM2D", "SiMPle"]
+
+
 
 @ray.remote
 def compute_groups_from_list_file(input_txt_file,
@@ -42,7 +47,7 @@ def compute_groups_from_list_file(input_txt_file,
 
     :return: None
     """
-
+    progress_bar=None
     start_time = time.monotonic()
     _LOGGER.info("Extracting Batch File: %s " % input_txt_file)
     data = read_txt_file(input_txt_file)
@@ -87,7 +92,7 @@ def compute_groups_from_list_file(input_txt_file,
 
 def batch_groups(dataset_csv,
                  feature_dir,
-                 results_dir,
+                 cache_dir,
                  save_csv_dir,
                  batchesdir,
                  shortname='covers80',
@@ -108,8 +113,8 @@ def batch_groups(dataset_csv,
 
     :return: None
     """
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
 
     batch_file_dir = batchesdir
 
@@ -128,9 +133,9 @@ def batch_groups(dataset_csv,
             algorithm_id = ray.put(algorithm)
             features_dir_id = ray.put(feature_dir)
             chroma_type_id = ray.put(chroma_type)
-            results_dir_id = ray.put(results_dir)
+            cache_dir_id = ray.put(cache_dir)
 
-            ray.get([compute_groups_from_list_file.remote(cpath,features_dir_id, results_dir_id,algorithm_id,chroma_type_id) for cpath in cpaths])
+            ray.get([compute_groups_from_list_file.remote(cpath,features_dir_id, cache_dir_id,algorithm_id,chroma_type_id) for cpath in cpaths])
 
     elif mode == 0:
         tic = time.monotonic()
@@ -139,15 +144,191 @@ def batch_groups(dataset_csv,
             features_dir_id = ray.put(feature_dir)
             shortname_id = ray.put(shortname)
             chroma_type_id = ray.put(chroma_type)
-            results_dir_id = ray.put(results_dir)
+            cache_dir_id = ray.put(cache_dir)
 
-            ray.get(compute_groups_from_list_file.remote(cpath,features_dir_id, results_dir_id,algorithm_id,shortname_id,chroma_type_id))
+            ray.get(compute_groups_from_list_file.remote(cpath,features_dir_id, cache_dir_id,algorithm_id,shortname_id,chroma_type_id))
 
         _LOGGER.info("Single mode similarity finished in %s" % (time.monotonic() - tic))
     else:
         raise IOError("Wrong value for the parameter 'mode'. Should be either 'single' or 'parallel'")
     savelist_to_file(_ERRORS,'_erros_acoss.coversid.txt')
     #rmtree(batch_file_dir)
+    _LOGGER.info("Log file located at '%s'" % _LOG_FILE_PATH)
+
+
+def benchmark_ray(dataset_csv,
+              feature_dir,
+              cache_dir='cache',
+              chroma_type="hpcp",
+              algorithm="Serra09",
+              shortname="covers80",
+              parallel=True,
+              n_workers=-1):
+    """Benchmark a specific cover id algorithm with a given input dataset annotation csv file.
+
+    Arguments:
+        dataset_csv {string} -- path to dataset csv annotation file
+        feature_dir {string} -- path to the directory where the pre-computed audio features are stored
+
+    Keyword Arguments:
+        feature_type {str} -- type of audio feature you want to use for benchmarking. (default: {"hpcp"})
+        algorithm {str} -- name of the algorithm you want to benchmark (default: {"Serra09"})
+        shortname {str} -- description (default: {"DaTacos-Benchmark"})
+        parallel {bool} -- whether you want to run the benchmark process with parallel workers (default: {True})
+        n_workers {int} -- number of workers required. By default it uses as much workers available on the system. (default: {-1})
+
+    Raises:
+        NotImplementedError: when an given algorithm method in not implemented in acoss.benchmark
+    """
+
+    if algorithm not in algorithm_names:
+        warn = ("acoss.coverid: Couldn't find '%s' algorithm in acoss \
+                                Available cover id algorithms are %s "
+                % (algorithm, str(algorithm_names)))
+        _LOGGER.debug(warn)
+        raise NotImplementedError(warn)
+
+    _LOGGER.info("Running acoss cover identification benchmarking for the algorithm - '%s'" % algorithm)
+
+    start_time = time.monotonic()
+
+    if algorithm == "Serra09":
+        from .algorithms.rqa_serra09 import Serra09
+        # here run the algo
+        serra09 = Serra09(dataset_csv=dataset_csv,
+                          datapath=feature_dir,
+                          chroma_type=chroma_type,
+                          shortname=shortname)
+        _LOGGER.info('Computing pairwise similarity...')
+        serra09.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
+        serra09.normalize_by_length()
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+        for similarity_type in serra09.Ds.keys():
+            serra09.getEvalStatistics(similarity_type)
+        serra09.cleanup_memmap()
+
+    elif algorithm == "EarlyFusionTraile":
+        from acoss.algorithms.earlyfusion_traile import EarlyFusion
+
+        _LOGGER.info('Starting EarlyFusionTraile...')
+
+        # get basic variables
+        CA = CoverAlgorithm(dataset_csv,
+                            name=algorithm,
+                            datapath=feature_dir,
+                            shortname=shortname,
+                            cachedir=cache_dir,
+                            similarity_types=["mfccs", "ssms", "chromas", "early"])
+
+        filepaths_id = ray.put(CA.filepaths)
+        workers = []
+        for k in range(n_workers):
+            EF_ID = EarlyFusion.remote(dataset_csv=dataset_csv,
+                               datapath=feature_dir,
+                               cache_dir=cache_dir,
+                               chroma_type=chroma_type,
+                               shortname=shortname,
+                               K=10,
+                               filepaths=filepaths_id,
+                               create_Ds=False)
+            workers.append(EF_ID)
+
+        _LOGGER.info('Feature loading done...')
+
+        n_chunks = 10
+        chunks = np.array_split(range(len(CA.filepaths)), n_chunks)
+        works_ids = []
+        w = 0
+        for chunk in chunks:
+            works_ids.append(workers[w].load_features_in_block.remote(chunk, keep_features_in_memory=False))
+            w = (w + 1) % n_workers
+
+        while len(works_ids) > 0:
+            done_work, works_ids = ray.wait(works_ids)
+
+        _LOGGER.info('Computing pairwise similarity...')
+
+        chunks = ray.get(workers[0].generate_pairs.remote(n_chunks=10,symmetric=True))
+
+        w = 0
+        works_simm = []
+        for chunk in chunks:
+            works_simm.append(workers[w].similarity.remote(chunk))
+            w = (w+1)%n_workers
+        count = 0
+        while len(works_simm):
+            done_work, works_simm = ray.wait(works_simm)
+            results = ray.get(done_work)[0]
+            CA.set_Ds_results(results)
+
+        DS_ID = ray.put(CA.get_Ds())
+
+        workers[0].set_Ds.remote(DS_ID)
+        ray.get(workers[0].get_all_clique_ids.remote())
+        ray.get(workers[0].apply_simmetry.remote(symmetric=True))
+
+        # early_fusion.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
+        ray.get(workers[0].do_late_fusion.remote())
+
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+
+        work_eval = [workers[0].getEvalStatistics.remote(similarity_type) for similarity_type in CA.get_Ds().keys()]
+        ray.get(work_eval)
+
+        CA.cleanup_memmap()
+
+    elif algorithm == "LateFusionChen":
+        from .algorithms.latefusion_chen import ChenFusion
+
+        chenFusion = ChenFusion(dataset_csv=dataset_csv,
+                                datapath=feature_dir,
+                                chroma_type=chroma_type,
+                                shortname=shortname)
+        _LOGGER.info('Computing pairwise similarity...')
+        chenFusion.all_pairwise(parallel, n_cores=n_workers, symmetric=True, verbose=False)
+        chenFusion.normalize_by_length()
+        chenFusion.do_late_fusion()
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+        for similarity_type in chenFusion.Ds.keys():
+            _LOGGER.info(similarity_type)
+            chenFusion.getEvalStatistics(similarity_type)
+        chenFusion.cleanup_memmap()
+
+    elif algorithm == "FTM2D":
+        from .algorithms.ftm2d import FTM2D
+
+        ftm2d = FTM2D(dataset_csv=dataset_csv,
+                      datapath=feature_dir,
+                      chroma_type=chroma_type,
+                      shortname=shortname)
+        for i in range(len(ftm2d.filepaths)):
+            ftm2d.load_features(i)
+        _LOGGER.info('Feature loading done...')
+        _LOGGER.info('Computing pairwise similarity...')
+        ftm2d.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+        for similarity_type in ftm2d.Ds.keys():
+            ftm2d.getEvalStatistics(similarity_type)
+        ftm2d.cleanup_memmap()
+
+    elif algorithm == "SiMPle":
+        from .algorithms.simple_silva import Simple
+
+        simple = Simple(dataset_csv=dataset_csv,
+                        datapath=feature_dir,
+                        chroma_type=chroma_type,
+                        shortname=shortname)
+        for i in range(len(simple.filepaths)):
+            simple.load_features(i)
+        _LOGGER.info('Feature loading done...')
+        _LOGGER.info('Computing pairwise similarity...')
+        simple.all_pairwise(parallel, n_cores=n_workers, symmetric=False)
+        _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
+        for similarity_type in simple.Ds.keys():
+            simple.getEvalStatistics(similarity_type)
+        simple.cleanup_memmap()
+
+    _LOGGER.info("acoss.coverid benchmarking finsihed in %s" % (time.monotonic() - start_time))
     _LOGGER.info("Log file located at '%s'" % _LOG_FILE_PATH)
 
 
@@ -205,26 +386,40 @@ def benchmark(dataset_csv,
     elif algorithm == "EarlyFusionTraile":
         from acoss.algorithms.earlyfusion_traile import EarlyFusion
         _LOGGER.info('Starting EarlyFusionTraile...')
-        early_fusion = EarlyFusion(dataset_csv=dataset_csv,
+        early_fusion = EarlyFusion.remote(dataset_csv=dataset_csv,
                                    datapath=feature_dir,
                                    cache_dir=cache_dir,
                                    chroma_type=chroma_type,
                                    shortname=shortname,
                                    K=10)
         _LOGGER.info('Feature loading done...')
-        if parallel:
-            early_fusion.load_features_parallel(n_cores=n_workers)
-        else:
-            for i in range(len(early_fusion.filepaths)):
-                early_fusion.load_features(i,keep_features_in_memory=False)
+
+        filepaths = ray.get(early_fusion.get_filepaths.remote())
+        print("filepaths: ",len(filepaths))
+        works_ids = [early_fusion.load_features.remote(i,keep_features_in_memory=False) for i in range(len(filepaths))]
+        print("works_ids",len(works_ids))
+
+        while len(works_ids)>0:
+            done_work, rest = ray.wait(works_ids)
+            works_ids=rest
 
         _LOGGER.info('Computing pairwise similarity...')
-        early_fusion.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
-        early_fusion.do_late_fusion()
+
+        chunks = ray.get(early_fusion.generate_pairs.remote(symmetric=True))
+        works = [early_fusion.compute_similarity.remote(chunk) for chunk in chunks]
+        while len(works):
+            done_work, works = ray.wait(works)
+        ray.get(early_fusion.get_all_clique_ids.remote())
+        ray.get(early_fusion.apply_simmetry.remote(symmetric=True))
+
+        #early_fusion.all_pairwise(parallel, n_cores=n_workers, symmetric=True)
+        ray.get(early_fusion.do_late_fusion.remote())
+
         _LOGGER.info('Running benchmark evaluations on the given dataset - %s' % dataset_csv)
-        for similarity_type in early_fusion.Ds:
-            early_fusion.getEvalStatistics(similarity_type)
-        early_fusion.cleanup_memmap()
+        Ds_Types = ray.get(early_fusion.get_Ds_types.remote())
+        work = [early_fusion.getEvalStatistics.remote(similarity_type) for similarity_type in Ds_Types]
+        ray.get(work)
+        ray.get(early_fusion.cleanup_memmap.remote())
 
     elif algorithm  == "LateFusionChen":
         from .algorithms.latefusion_chen import ChenFusion
@@ -290,8 +485,8 @@ def parser_args(cmd_args):
                         help="Input dataset csv file")
     parser.add_argument("-d", '--feature_dir', type=str, action="store", default='../features_covers80',
                         help="Path to data files")
-    parser.add_argument("-r", '--results_dir', type=str, action="store", default='../results',
-                        help="Path to results files")
+    parser.add_argument("-r", '--cache_dir', type=str, action="store", default='../cache',
+                        help="Path to cache files")
     parser.add_argument("-v", '--csv_dir', type=str, action="store", default='../csv',
                         help="Path to csv temporary files")
     parser.add_argument("-b", '--batches_dir', type=str, action="store", default='../batches',
@@ -331,7 +526,7 @@ if __name__ == '__main__':
     # args.shortname="covers10k"
 
     # Start Ray
-    useRay = False
+    useRay = True
 
     num_cpus = args.n_workers
     if args.n_workers == -1:
@@ -343,25 +538,25 @@ if __name__ == '__main__':
             ray.init(address=os.environ["ip_head"],
                      redis_password=args.redis_password)  # 1 GB
         else:
-            ray.init(num_cpus=num_cpus)
+            ray.init(num_cpus=num_cpus, memory=int(2*1024*1024*1024), object_store_memory=(300*1024*1024))
 
-    if useRay or args.type_cluster == 1:
-
-        batch_groups(dataset_csv=args.dataset_csv,
-                     feature_dir=args.feature_dir,
-                     results_dir=args.results_dir,
-                     save_csv_dir=args.csv_dir,
-                     batchesdir=args.batches_dir,
-                     shortname=args.shortname,
-                     mode=args.parallel,
-                     algorithm=args.algorithm,
-                     chroma_type=args.chroma_type,
-                     n_workers=num_cpus)
-    else:
-        benchmark(dataset_csv=args.dataset_csv,
-                  feature_dir=args.feature_dir,
-                  chroma_type=args.chroma_type,
-                  algorithm=args.algorithm,
-                  shortname=args.shortname,
-                  parallel=bool(args.parallel),
-                  n_workers=args.n_workers)
+    # if useRay or args.type_cluster == 1:
+    #
+    #     batch_groups(dataset_csv=args.dataset_csv,
+    #                  feature_dir=args.feature_dir,
+    #                  cache_dir=args.cache_dir,
+    #                  save_csv_dir=args.csv_dir,
+    #                  batchesdir=args.batches_dir,
+    #                  shortname=args.shortname,
+    #                  mode=args.parallel,
+    #                  algorithm=args.algorithm,
+    #                  chroma_type=args.chroma_type,
+    #                  n_workers=num_cpus)
+    # else:
+    benchmark_ray(dataset_csv=args.dataset_csv,
+              feature_dir=args.feature_dir,
+              chroma_type=args.chroma_type,
+              algorithm=args.algorithm,
+              shortname=args.shortname,
+              parallel=bool(args.parallel),
+              n_workers=args.n_workers)

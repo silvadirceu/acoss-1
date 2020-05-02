@@ -4,6 +4,7 @@ Tralie, C.J., 2017. Early mfcc and hpcp fusion for robust cover song identificat
 """
 import argparse
 import deepdish as dd
+import ray
 from .algorithm_template import CoverAlgorithm
 from .utils.alignment_tools import smith_waterman_constrained as alignment_fn
 from .utils.cross_recurrence import *
@@ -16,7 +17,7 @@ __all__ = ['EarlyFusion']
             FEATURE COMPUTATION/COMPARISON
 ===================================================="""
 
-
+@ray.remote
 class EarlyFusion(CoverAlgorithm):
     """
     Attributes
@@ -42,7 +43,8 @@ class EarlyFusion(CoverAlgorithm):
         A cache of features computed by load_features
     """
     def __init__(self, dataset_csv, datapath, cache_dir='cache' ,chroma_type='hpcp', shortname='Covers80', blocksize=20,
-                 mfccs_per_block=50, ssm_res=50, chromas_per_block=40, kappa=0.1, K=10, niters=5, log_times=False):
+                 mfccs_per_block=50, ssm_res=50, chromas_per_block=40, kappa=0.1, K=10, niters=5, log_times=False,
+                 create_Ds = True, filepaths=None):
         self.chroma_type = chroma_type
         self.blocksize = blocksize
         self.mfccs_per_block = mfccs_per_block
@@ -56,7 +58,7 @@ class EarlyFusion(CoverAlgorithm):
             self.times = {'features': [], 'raw': []}
         CoverAlgorithm.__init__(self, dataset_csv=dataset_csv, name="EarlyFusionTraile", datapath=datapath,
                                 shortname=shortname, similarity_types=["mfccs", "ssms", "chromas", "early"],
-                                cachedir=cache_dir)
+                                cachedir=cache_dir, create_Ds=create_Ds, filepaths=filepaths)
 
     def get_cacheprefix(self):
         """
@@ -66,11 +68,10 @@ class EarlyFusion(CoverAlgorithm):
         return "%s/%s_%s_%s"%(self.cachedir, self.name, self.shortname, self.chroma_type)
 
 
-    def load_features_parallel(self, n_cores=8, keep_features_in_memory=True):
+    def load_features_in_block(self,idxs,keep_features_in_memory=False):
+        for i in idxs:
+            self.load_features(i, keep_features_in_memory=keep_features_in_memory)
 
-        from joblib import Parallel, delayed
-        Parallel(n_jobs=n_cores, verbose=1)(
-            delayed(self.load_features)(i,keep_features_in_memory=False) for i in range(len(self.filepaths)))
 
     def load_features(self, i, do_plot=False, keep_features_in_memory=True):
         """
@@ -171,6 +172,7 @@ class EarlyFusion(CoverAlgorithm):
 
 
     def similarity(self, idxs, do_plot=False):
+        results = []
         for i, j in zip(idxs[:, 0], idxs[:, 1]):
             feats1 = self.load_features(i)
             feats2 = self.load_features(j)
@@ -208,8 +210,11 @@ class EarlyFusion(CoverAlgorithm):
             if self.log_times:
                 self.times['raw'].append(time.time()-tic)
 
-            for s in scores:
-                self.Ds[s][i, j] = scores[s]
+            results.append((scores,i,j))
+
+        return results
+            #for s in scores:
+            #    self.Ds[s][i, j] = scores[s]
 
     def do_late_fusion(self):
         """

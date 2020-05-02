@@ -33,7 +33,9 @@ class CoverAlgorithm(object):
                  datapath="features_benchmark",
                  shortname="full",
                  cachedir="cache",
-                 similarity_types=["main"]):
+                 similarity_types=["main"],
+                 create_Ds= True,
+                 filepaths=None):
         """
         Parameters
         ----------
@@ -51,16 +53,45 @@ class CoverAlgorithm(object):
         self.name = name
         self.shortname = shortname
         self.cachedir = cachedir
-        self.filepaths = create_dataset_filepaths(dataset_csv, root_audio_dir=datapath, file_format=".h5")
+        if filepaths is None:
+            self.filepaths = create_dataset_filepaths(dataset_csv, root_audio_dir=datapath, file_format=".h5")
+        else:
+            self.filepaths = filepaths
         self.cliques = {}
         self.N = len(self.filepaths)
         if not os.path.exists(cachedir):
             os.mkdir(cachedir)
-        self.Ds = {}
-        for s in similarity_types:
-            self.Ds[s] = np.memmap('%s_%s_dmat' % (self.get_cacheprefix(), s), shape=(self.N, self.N), mode='w+', dtype='float32')
+        if create_Ds:
+            self.Ds = {}
+            for s in similarity_types:
+                self.Ds[s] = np.memmap('%s_%s_dmat' % (self.get_cacheprefix(), s), shape=(self.N, self.N), mode='w+', dtype='float32')
         print("Initialized %s algorithm on %i songs in dataset %s" % (name, self.N, shortname))
-    
+
+    def get_filepaths(self):
+        return self.filepaths
+
+    def get_Ds(self):
+        return self.Ds
+
+    def set_Ds(self,Ds):
+        self.Ds = Ds
+
+    def set_Ds_from_position (self,score,i,j):
+        for s in score:
+            self.Ds[s][i, j] = score[s]
+
+    def set_Ds_results(self,results):
+        """
+        Set Ds from a vector of similarity results
+        Parameters
+        ----------
+        results: list
+            results is a list of (scores, i, j)
+        """
+
+        for result in results:
+            self.set_Ds_from_position(*result)
+
     def get_cacheprefix(self):
         """
         Return a descriptive file prefix to use for caching features
@@ -137,7 +168,42 @@ class CoverAlgorithm(object):
             j = idxs[k][1]
             score = 0.0
             self.Ds["main"][i, j] = score
-    
+
+    def generate_pairs(self, n_cores=None, n_chunks=1, symmetric=False, precomputed=False):
+        from itertools import combinations, permutations
+        h5filename = "%s_Ds.h5" % self.get_cacheprefix()
+
+        chunks=None
+
+        if precomputed:
+            self.Ds = dd.io.load(h5filename)
+            self.get_all_clique_ids()
+        else:
+            if symmetric:
+                all_pairs = [(i, j) for idx, (i, j) in enumerate(combinations(range(len(self.filepaths)), 2))]
+            else:
+                all_pairs = [(i, j) for idx, (i, j) in enumerate(permutations(range(len(self.filepaths)), 2))]
+
+            if n_cores is not None:
+                n_chunks = n_cores
+            chunks = np.array_split(all_pairs, n_chunks)
+
+        return chunks
+
+
+    def apply_simmetry(self, symmetric=False):
+
+        h5filename = "%s_Ds.h5" % self.get_cacheprefix()
+
+        if symmetric:
+            for similarity_type in self.Ds:
+                self.Ds[similarity_type] += self.Ds[similarity_type].T
+                # if verbose:
+                #    progressbar.next()
+
+        dd.io.save(h5filename, self.Ds)
+
+
     def all_pairwise(self, parallel=0, n_cores=12, symmetric=False, precomputed=False, verbose=True):
         """
         Do all pairwise comparisons between songs, with code that is 
