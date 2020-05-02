@@ -554,9 +554,10 @@ if __name__ == '__main__':
     #                  n_workers=num_cpus)
     # else:
     benchmark_ray(dataset_csv=args.dataset_csv,
-              feature_dir=args.feature_dir,
-              chroma_type=args.chroma_type,
-              algorithm=args.algorithm,
-              shortname=args.shortname,
-              parallel=bool(args.parallel),
-              n_workers=args.n_workers)
+                  cache_dir=args.cache_dir,
+                  feature_dir=args.feature_dir,
+                  chroma_type=args.chroma_type,
+                  algorithm=args.algorithm,
+                  shortname=args.shortname,
+                  parallel=bool(args.parallel),
+                  n_workers=args.n_workers)
