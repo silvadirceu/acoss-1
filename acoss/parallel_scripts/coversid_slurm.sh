@@ -28,4 +28,4 @@ python coverid_ray.py -i '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data
 -r '/home/covers10k/dirceusilva/data/Covers10k/results/' \
 -v '/home/covers10k/dirceusilva/data/Covers10k/csv/' \
 -b '/home/covers10k/dirceusilva/data/Covers10k/batches/' \
--a 'EarlyFusionTraile' -c 'hpcp' -p 1 -n 384 -t 0 -s "covers20k"
+-a 'EarlyFusionTraile' -c 'hpcp' -p 1 -n 384 -t 1 -s "coversBR"
