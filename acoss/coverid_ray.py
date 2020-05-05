@@ -235,7 +235,7 @@ def benchmark_ray(dataset_csv,
 
         _LOGGER.info('Feature loading done...')
 
-        n_chunks = 10
+        n_chunks = n_workers
         chunks = np.array_split(range(len(CA.filepaths)), n_chunks)
         works_ids = []
         w = 0
@@ -248,7 +248,7 @@ def benchmark_ray(dataset_csv,
 
         _LOGGER.info('Computing pairwise similarity...')
 
-        chunks = ray.get(workers[0].generate_pairs.remote(n_chunks=10,symmetric=True))
+        chunks = ray.get(workers[0].generate_pairs.remote(n_chunks=n_chunks,symmetric=True))
 
         w = 0
         works_simm = []

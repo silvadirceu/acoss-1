@@ -4,7 +4,7 @@
 
 #SBATCH --partition=normal
 #SBATCH --job-name=covers10k
-##SBATCH --cpus-per-task=10
+##SBATCH --cpus-per-task=8
 #SBATCH --mem=80GB
 #SBATCH --nodes=16
 #SBATCH --tasks-per-node=1
@@ -38,7 +38,7 @@ export ip_head # Exporting for latter access by trainer.py
 echo "STARTING HEAD at $node1"
 # Starting the head
 srun --nodes=1 --ntasks=1 -w $node1 ray start --block --head --redis-port=6379 --redis-password=$redis_password \
---object-store-memory=$((1024 * 1024 * 1024))  --memory=$((7 * 1024 * 1024 * 1024)) &
+--object-store-memory=$((2*1024 * 1024 * 1024))  --memory=$((7 * 1024 * 1024 * 1024)) &
 sleep 5
 
 for ((  i=1; i<=$worker_num; i++ ))
@@ -46,7 +46,7 @@ do
   # Starting the workers
   node2=${nodes_array[$i]}
   srun --nodes=1 --ntasks=1 -w $node2 ray start --block --address=$ip_head --redis-password=$redis_password \
-  --object-store-memory=$((1024 * 1024 * 1024))  --memory=$((7 * 1024 * 1024 * 1024)) &
+  --object-store-memory=$((2*1024 * 1024 * 1024))  --memory=$((7 * 1024 * 1024 * 1024)) &
   sleep 5
 done
 
