@@ -17,7 +17,7 @@ python coverid_ray.py -i 'data/Covers10k_p2.csv' \
 -r '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/results/' \
 -v '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/csv/' \
 -b '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/batches/' \
--a 'EarlyFusionTraile' -c 'hpcp' -p 1 -n 8 -t 0 -s "coversBR"
+-a 'FTM2D' -c 'hpcp' -p 1 -n 8 -t 0 -s "coversBR"
 
 
 #python coverid_ray.py -i 'data/Covers10k_p.csv' \

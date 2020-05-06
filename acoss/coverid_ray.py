@@ -193,7 +193,7 @@ def benchmark_ray(dataset_csv,
     start_time = time.monotonic()
 
     if algorithm == "Serra09":
-        from .algorithms.rqa_serra09 import Serra09
+        from acoss.algorithms.rqa_serra09 import Serra09
         # here run the algo
         serra09 = Serra09(dataset_csv=dataset_csv,
                           datapath=feature_dir,
@@ -283,7 +283,7 @@ def benchmark_ray(dataset_csv,
         CA.cleanup_memmap()
 
     elif algorithm == "LateFusionChen":
-        from .algorithms.latefusion_chen import ChenFusion
+        from acoss.algorithms.latefusion_chen import ChenFusion
 
         chenFusion = ChenFusion(dataset_csv=dataset_csv,
                                 datapath=feature_dir,
@@ -300,7 +300,7 @@ def benchmark_ray(dataset_csv,
         chenFusion.cleanup_memmap()
 
     elif algorithm == "FTM2D":
-        from .algorithms.ftm2d import FTM2D
+        from acoss.algorithms.ftm2d import FTM2D
 
         ftm2d = FTM2D(dataset_csv=dataset_csv,
                       datapath=feature_dir,
@@ -317,7 +317,7 @@ def benchmark_ray(dataset_csv,
         ftm2d.cleanup_memmap()
 
     elif algorithm == "SiMPle":
-        from .algorithms.simple_silva import Simple
+        from acoss.algorithms.simple_silva import Simple
 
         simple = Simple(dataset_csv=dataset_csv,
                         datapath=feature_dir,
@@ -374,7 +374,7 @@ def benchmark(dataset_csv,
     start_time = time.monotonic()
 
     if algorithm == "Serra09":
-        from .algorithms.rqa_serra09 import Serra09
+        from acoss.algorithms.rqa_serra09 import Serra09
         # here run the algo
         serra09 = Serra09(dataset_csv=dataset_csv,
                           datapath=feature_dir,
@@ -427,7 +427,7 @@ def benchmark(dataset_csv,
         ray.get(early_fusion.cleanup_memmap.remote())
 
     elif algorithm  == "LateFusionChen":
-        from .algorithms.latefusion_chen import ChenFusion
+        from acoss.algorithms.latefusion_chen import ChenFusion
 
         chenFusion = ChenFusion(dataset_csv=dataset_csv,
                                 datapath=feature_dir,
@@ -444,7 +444,7 @@ def benchmark(dataset_csv,
         chenFusion.cleanup_memmap()
 
     elif algorithm == "FTM2D":
-        from .algorithms.ftm2d import FTM2D
+        from acoss.algorithms.ftm2d import FTM2D
 
         ftm2d = FTM2D(dataset_csv=dataset_csv,
                       datapath=feature_dir,
@@ -461,7 +461,7 @@ def benchmark(dataset_csv,
         ftm2d.cleanup_memmap()
 
     elif algorithm == "SiMPle":
-        from .algorithms.simple_silva import Simple
+        from acoss.algorithms.simple_silva import Simple
 
         simple = Simple(dataset_csv=dataset_csv,
                         datapath=feature_dir,
