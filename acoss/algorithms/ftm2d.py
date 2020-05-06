@@ -6,6 +6,8 @@ import numpy as np
 import argparse
 import scipy
 from .algorithm_template import CoverAlgorithm
+import os
+import deepdish as dd
 
 __all__ = ['FTM2D']
 

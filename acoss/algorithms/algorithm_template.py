@@ -186,6 +186,9 @@ class CoverAlgorithm(object):
 
             if n_cores is not None:
                 n_chunks = n_cores
+            elif n_chunks > len(all_pairs):
+                n_chunks = len(all_pairs)
+
             chunks = np.array_split(all_pairs, n_chunks)
 
         return chunks
