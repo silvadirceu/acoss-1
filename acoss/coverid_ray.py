@@ -248,7 +248,7 @@ def benchmark_ray(dataset_csv,
 
         _LOGGER.info('Computing pairwise similarity...')
 
-        chunks = ray.get(workers[0].generate_pairs.remote(n_chunks=n_chunks,symmetric=True))
+        chunks = ray.get(workers[0].generate_pairs.remote(n_chunks=10*n_workers,symmetric=True))
 
         w = 0
         works_simm = []
@@ -260,6 +260,8 @@ def benchmark_ray(dataset_csv,
             done_work, works_simm = ray.wait(works_simm)
             results = ray.get(done_work)[0]
             CA.set_Ds_results(results)
+            _LOGGER.info('Block - %s Processed' % str(count))
+            count=count+1
 
         DS_ID = ray.put(CA.get_Ds())
 
