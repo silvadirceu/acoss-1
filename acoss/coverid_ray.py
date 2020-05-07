@@ -307,6 +307,7 @@ def benchmark_ray(dataset_csv,
                       chroma_type=chroma_type,
                       shortname=shortname)
         for i in range(len(ftm2d.filepaths)):
+            print(ftm2d.filepaths[i])
             ftm2d.load_features(i)
         _LOGGER.info('Feature loading done...')
         _LOGGER.info('Computing pairwise similarity...')
@@ -451,6 +452,7 @@ def benchmark(dataset_csv,
                       chroma_type=chroma_type,
                       shortname=shortname)
         for i in range(len(ftm2d.filepaths)):
+            print(ftm2d.filepaths[i])
             ftm2d.load_features(i)
         _LOGGER.info('Feature loading done...')
         _LOGGER.info('Computing pairwise similarity...')

@@ -129,7 +129,9 @@ def btchroma_to_fftmat(btchroma, win=75):
     nchrm, nbeats = btchroma.shape
     assert nchrm == 12, 'beat-aligned matrix transposed?'
     if nbeats < win:
-        return None
+        btchroma = np.pad(btchroma,((0,0),(0,win-nbeats)),'constant')
+        nchrm, nbeats = btchroma.shape
+        #return None
     # output
     fftmat = np.zeros((nchrm * win, nbeats - win + 1))
     for i in range(nbeats-win+1):

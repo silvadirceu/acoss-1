@@ -12,8 +12,8 @@
 #-f 'hpcp' 'key_extractor' 'madmom_features' 'mfcc_htk' 'chroma_cens' 'crema' \
 #-m 'single' -n 1 -r 1
 
-python coverid_ray.py -i 'data/Covers10k_p2.csv' \
--d '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/features/' \
+python coverid_ray.py -i 'data/songs_benchmark2.csv' \
+-d '/mnt/Data/dirceusilva/dados/ECAD/benchmark/' \
 -r '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/results/' \
 -v '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/csv/' \
 -b '/mnt/Data/dirceusilva/Results/features/Covers10k_11khz/batches/' \
