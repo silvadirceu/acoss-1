@@ -221,6 +221,9 @@ def benchmark_ray(dataset_csv,
                             similarity_types=["mfccs", "ssms", "chromas", "early"])
 
         filepaths_id = ray.put(CA.filepaths)
+
+        EarlyFusion = ray.remote(EarlyFusion)
+
         workers = []
         for k in range(n_workers):
             EF_ID = EarlyFusion.remote(dataset_csv=dataset_csv,

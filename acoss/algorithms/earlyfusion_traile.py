@@ -17,7 +17,6 @@ __all__ = ['EarlyFusion']
             FEATURE COMPUTATION/COMPARISON
 ===================================================="""
 
-@ray.remote
 class EarlyFusion(CoverAlgorithm):
     """
     Attributes

@@ -40,6 +40,12 @@ pip install numpy cython  tensorflow keras tables ray psutil scikit-image h5py
 pip install numba pandas scipy scikit-learn deepdish progress
 pip install crema librosa==0.6.2 pumpp essentia madmom
 
+#conda install -c anaconda numpy cython pytables psutil pandas  scipy scikit-learn scikit-image
+#conda install -c numba numba
+#conda install -c conda-forge deepdish progress tensorflow keras
+#conda install -c thomasfillon essentia
+#conda install -c conda-forge librosa==0.6.2
+
 #git clone https://github.com/silvadirceu/acoss-1.git
 #cd acoss-1
 python setup.py install

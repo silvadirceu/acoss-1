@@ -11,8 +11,8 @@
 #SBATCH --mail-user=dirceu.silva@co.it.pt
 #SBATCH --mail-type=ALL
 #SBATCH --time=1-00:00:00
-#SBATCH --output=/home/covers10k/dirceusilva/data/Covers10k/output.txt
-#SBATCH --error=/home/covers10k/dirceusilva/data/Covers10k/error.txt
+#SBATCH --output=/home/covers10k/dirceusilva/data/Covers10k/output_traile.txt
+#SBATCH --error=/home/covers10k/dirceusilva/data/Covers10k/error_traile.txt
 
 
 worker_num=15 # Must be one less that the total number of nodes
@@ -51,8 +51,8 @@ do
 done
 
 
-python coverid_ray.py -i '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data/Covers10k_p1.csv' \
--d '/home/covers10k/dirceusilva/data/Covers10k/features/' \
+python coverid_ray.py -i '/home/covers10k/dirceusilva/scripts/acoss-1/acoss/data/songs_benchmark2.csv' \
+-d '/home/covers10k/dirceusilva/data/benchmark/' \
 -r '/home/covers10k/dirceusilva/data/Covers10k/cache/' \
 -v '/home/covers10k/dirceusilva/data/Covers10k/csv/' \
 -b '/home/covers10k/dirceusilva/data/Covers10k/batches/' \
