@@ -10,7 +10,8 @@ import scipy
 import numpy as np
 from librosa import util
 from librosa import filters
-from .algorithm_template import CoverAlgorithm
+from acoss.algorithms.algorithm_template import CoverAlgorithm
+import ray
 
 __all__ = ['Simple']
 
@@ -23,13 +24,16 @@ class Simple(CoverAlgorithm):
     WIN=200, the window length for the dimensionality reduction
     SKIP=100, how many frames the dim reduction will skip each step
     """
-    def __init__(self, dataset_csv, datapath, chroma_type='hpcp', shortname='Covers80',
+    def __init__(self, dataset_csv = None, audios_features_vector = None, datapath = "features_benchmark", chroma_type='hpcp', shortname='Covers80',
                  SSLEN=10, WIN=200, SKIP=100):
+        """
+        Atila: ajustes para aceitar como parametro o vetor de features, e passar ele adiante para a CoverAlgorithm.
+        """
         self.SSLEN = SSLEN
         self.WIN = WIN
         self.SKIP = SKIP
         self.chroma_type = chroma_type
-        CoverAlgorithm.__init__(self, dataset_csv=dataset_csv, name="SiMPle", datapath=datapath, shortname=shortname)
+        CoverAlgorithm.__init__(self, dataset_csv=dataset_csv, audios_features_vector = audios_features_vector, name="SiMPle", datapath=datapath, shortname=shortname)
 
     def load_features(self, i, do_plot=False):
         feats = CoverAlgorithm.load_features(self, i)
@@ -124,6 +128,30 @@ class Simple(CoverAlgorithm):
             Sj,_ = self.oti(Si,self.load_features(j))
             sim = -self.simple_sim(Si, Sj)
             self.Ds['main'][i, j] = sim
+
+            
+    @ray.remote  #Atila: para Ray
+    def similarity_ray(self, idxs):
+        """
+        sim = {}
+        Si = self.load_features(idxs[0])
+        Sj,_ = self.oti(Si,self.load_features(idxs[1]))
+        sim['main'] = -self.simple_sim(Si, Sj)
+        return sim, idxs[0], idxs[1]
+        """
+        smat = {}
+        for i,j in zip(idxs[:, 0], idxs[:, 1]):
+            sim = {}
+            ij = (i,j)
+            Si = self.load_features(i)
+            Sj,_ = self.oti(Si,self.load_features(j))
+            sim['main'] = -self.simple_sim(Si, Sj)
+            smat[ij] = sim
+
+        #self.Ds['main'][i, j] = sim
+        return smat
+
+        
 
 
 if __name__ == '__main__':

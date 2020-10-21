@@ -4,11 +4,11 @@ Tralie, C.J., 2017. Early mfcc and hpcp fusion for robust cover song identificat
 """
 import argparse
 import deepdish as dd
+from acoss.algorithms.algorithm_template import CoverAlgorithm
+from acoss.algorithms.utils.alignment_tools import smith_waterman_constrained as alignment_fn
+from acoss.algorithms.utils.cross_recurrence import *
+from acoss.algorithms.utils.similarity_fusion import *
 import ray
-from .algorithm_template import CoverAlgorithm
-from .utils.alignment_tools import smith_waterman_constrained as alignment_fn
-from .utils.cross_recurrence import *
-from .utils.similarity_fusion import *
 
 __all__ = ['EarlyFusion']
 
@@ -16,6 +16,7 @@ __all__ = ['EarlyFusion']
 """====================================================
             FEATURE COMPUTATION/COMPARISON
 ===================================================="""
+
 
 class EarlyFusion(CoverAlgorithm):
     """
@@ -41,10 +42,27 @@ class EarlyFusion(CoverAlgorithm):
     all_block_feats: dict
         A cache of features computed by load_features
     """
-    def __init__(self, dataset_csv, datapath, cache_dir='cache' ,chroma_type='hpcp', shortname='Covers80', blocksize=20,
-                 mfccs_per_block=50, ssm_res=50, chromas_per_block=40, kappa=0.1, K=10, niters=5, log_times=False,
-                 create_Ds = True, filepaths=None):
+    def __init__(self, dataset_csv = None, audios_features_vector = None, datapath = "features_benchmark", chroma_type='hpcp', onset_lib = 'librosa_onsets', shortname='Covers80', blocksize=20, mfccs_per_block=50, ssm_res=50, chromas_per_block=40, kappa=0.1, K=20, niters=3, log_times=False):
+        """
+        Atila: ajustes para aceitar como parametro o vetor de features, e passar ele adiante para a CoverAlgorithm.
+        Valores de parametros de GeometricCoverSongs
+        Kappa = 0.1                             ok
+        BeatsPerBlock = MFCCBeatsPerBlock  = 20    NOK?
+        dpixels = 50
+        mfccs_per_block = 50                    ok
+        chromas_per_block = 2 x BeatsPerBlock = 40  ok
+        nmfcc = 20
+        lifterexp = 0,6
+        CSMTypes:
+            MFCC: Euclidean
+            SSM: Euclidean
+            Chromas: CosineOTI
+        NIters = 3                              NOK Mudei para 3 - Estava 5
+        K = 20                                  NOK Mudei para 20 - Estava 10
+        Inclui parametro onset_lib, de modo a permitir indicar qual será a fonte do onsets a ser usado.
+        """
         self.chroma_type = chroma_type
+        self.onset_lib = onset_lib
         self.blocksize = blocksize
         self.mfccs_per_block = mfccs_per_block
         self.chromas_per_block = chromas_per_block
@@ -55,9 +73,7 @@ class EarlyFusion(CoverAlgorithm):
         self.log_times = log_times
         if log_times:
             self.times = {'features': [], 'raw': []}
-        CoverAlgorithm.__init__(self, dataset_csv=dataset_csv, name="EarlyFusionTraile", datapath=datapath,
-                                shortname=shortname, similarity_types=["mfccs", "ssms", "chromas", "early"],
-                                cachedir=cache_dir, create_Ds=create_Ds, filepaths=filepaths)
+        CoverAlgorithm.__init__(self, dataset_csv=dataset_csv, audios_features_vector = audios_features_vector, name="EarlyFusionTraile", datapath=datapath, shortname=shortname, similarity_types=["mfccs", "ssms", "chromas", "early"])
 
     def get_cacheprefix(self):
         """
@@ -66,13 +82,7 @@ class EarlyFusion(CoverAlgorithm):
         """
         return "%s/%s_%s_%s"%(self.cachedir, self.name, self.shortname, self.chroma_type)
 
-
-    def load_features_in_block(self,idxs,keep_features_in_memory=False):
-        for i in idxs:
-            self.load_features(i, keep_features_in_memory=keep_features_in_memory)
-
-
-    def load_features(self, i, do_plot=False, keep_features_in_memory=True):
+    def load_features(self, i, do_plot=False):  #Atila: modifiquei para usar onsets definido na chamada da função, com possibilidade de uso de librosa_onsets, garantindo coerencia de resultados com features extraidas em sequencia ou em paralelo (madmom_features-onsets tem resultados diferentes quando extraido em sequencia ou em paralelo.
         """
         Return a dictionary of all of the beat-synchronous blocked features
         Parameters
@@ -97,15 +107,15 @@ class EarlyFusion(CoverAlgorithm):
         if i in self.all_block_feats:
             # If the result has already been cached in memory,
             # return the cache
+            #print("load_features %d em memoria"%i)
             return self.all_block_feats[i]
         elif os.path.exists(filepath):
             # If the result has already been cached on disk,
             # load it, save it in memory, and return
-            #self.all_block_feats[i] = dd.io.load(filepath)
-            block_feats = dd.io.load(filepath)
+            self.all_block_feats[i] = dd.io.load(filepath)
             # Make sure to also load clique info as a side effect
             feats = CoverAlgorithm.load_features(self, i)
-            return block_feats #self.all_block_feats[i]
+            return self.all_block_feats[i]
         tic = time.time()
         block_feats = {}
         feats = CoverAlgorithm.load_features(self, i)
@@ -113,14 +123,11 @@ class EarlyFusion(CoverAlgorithm):
         mfcc = feats['mfcc_htk'].T
         mfcc[np.isnan(mfcc)] = 0
 
-        onsets = feats['madmom_features']['onsets']
+        #onsets = feats['madmom_features']['onsets']
+        #onsets = feats['librosa_onsets']['onsets']
+        onsets = feats[self.onset_lib]['onsets']
         n_beats = len(onsets)
-
-        blocksize = self.blocksize
-        if n_beats <= self.blocksize:     # change blocksize if NBeats  < bloscksize
-            blocksize = n_beats - n_beats%5
-
-        n_blocks = n_beats - blocksize
+        n_blocks = n_beats - self.blocksize
 
         ## Step 1: Compute raw MFCC and MFCC SSM blocked features
         # Allocate space for MFCC-based features
@@ -132,7 +139,7 @@ class EarlyFusion(CoverAlgorithm):
         # Compute MFCC-based features
         for b in range(n_blocks):
             i1 = onsets[b]
-            i2 = onsets[b+blocksize-1]
+            i2 = onsets[b+self.blocksize-1]
             x = resize_block(mfcc, i1, i2, self.mfccs_per_block)
             # Z-normalize
             x -= np.mean(x, 0)[None, :]
@@ -144,13 +151,12 @@ class EarlyFusion(CoverAlgorithm):
             D = get_ssm(xn)
             block_feats['ssms'][b, :] = D[I < J] # Upper triangular part
 
-
         ## Step 2: Compute chroma blocks
         block_feats['chromas'] = np.zeros((n_blocks, self.chromas_per_block*chroma.shape[1]), dtype=np.float32)
         block_feats['chroma_med'] = np.median(chroma, axis=0)
         for b in range(n_blocks):
             i1 = onsets[b]
-            i2 = onsets[b+blocksize]
+            i2 = onsets[b+self.blocksize]
             x = resize_block(chroma, i1, i2, self.chromas_per_block)
             block_feats['chromas'][b, :] = x.flatten()
 
@@ -161,9 +167,8 @@ class EarlyFusion(CoverAlgorithm):
             d = ssm_fns[feat](block_feats[feat])
             block_feats['%s_W'%feat] = getW(d, self.K)
         """
-        if keep_features_in_memory:
-            self.all_block_feats[i] = block_feats # Cache features
 
+        self.all_block_feats[i] = block_feats # Cache features
         dd.io.save(filepath, block_feats)
         if self.log_times:
             self.times['features'].append(time.time()-tic)
@@ -171,8 +176,8 @@ class EarlyFusion(CoverAlgorithm):
 
 
     def similarity(self, idxs, do_plot=False):
-        results = []
         for i, j in zip(idxs[:, 0], idxs[:, 1]):
+            print("EarlyFusion similarity entre (%d, %d)"%(i, j))
             feats1 = self.load_features(i)
             feats2 = self.load_features(j)
             ## Step 1: Create all of the parent SSMs
@@ -180,13 +185,17 @@ class EarlyFusion(CoverAlgorithm):
             scores = {}
             CSMs = {}
             tic = time.time()
+            
             CSMs['mfccs'] = get_csm(feats1['mfccs'], feats2['mfccs'])
             scores['mfccs'] = alignment_fn(csm_to_binary(CSMs['mfccs'], self.kappa))
+            
             CSMs['ssms'] = get_csm(feats1['ssms'], feats2['ssms'])
+   
             scores['ssms'] = alignment_fn(csm_to_binary(CSMs['ssms'], self.kappa))
-            CSMs['chromas'] = get_csm_blocked_oti(feats1['chromas'], feats2['chromas'],
-                                                  feats1['chroma_med'], feats2['chroma_med'],
-                                                  get_csm_cosine)
+            
+            CSMs['chromas'] = get_csm_blocked_oti(feats1['chromas'], feats2['chromas'], \
+                                                        feats1['chroma_med'], feats2['chroma_med'],\
+                                                        get_csm_cosine)
             scores['chromas'] = alignment_fn(csm_to_binary(CSMs['chromas'], self.kappa))
 
             ## Step 2: Compute Ws for each CSM
@@ -209,20 +218,84 @@ class EarlyFusion(CoverAlgorithm):
             if self.log_times:
                 self.times['raw'].append(time.time()-tic)
 
-            results.append((scores,i,j))
+            for s in scores:
+                self.Ds[s][i, j] = scores[s]
 
-        return results
+    @ray.remote  #Atila: para Ray
+    def similarity_ray(self, idxs, do_plot=False):
+        smat = {}
+        for i, j in zip(idxs[:, 0], idxs[:, 1]):
+            #i = idxs[0]
+            #j = idxs[1]
+            #print("EarlyFusion similarity_ray entre (%d, %d)"%(i, j))
+            feats1 = self.load_features(i)
+            feats2 = self.load_features(j)
+            ## Step 1: Create all of the parent SSMs
+            ij = (i,j)
+            Ws = {}
+            scores = {}
+            CSMs = {}
+            tic = time.time()
+            CSMs['mfccs'] = get_csm(feats1['mfccs'], feats2['mfccs'])
+            scores['mfccs'] = alignment_fn(csm_to_binary(CSMs['mfccs'], self.kappa))
+            CSMs['ssms'] = get_csm(feats1['ssms'], feats2['ssms'])
+
+            scores['ssms'] = alignment_fn(csm_to_binary(CSMs['ssms'], self.kappa))
+            CSMs['chromas'] = get_csm_blocked_oti(feats1['chromas'], feats2['chromas'], \
+                                                        feats1['chroma_med'], feats2['chroma_med'],\
+                                                        get_csm_cosine)
+            scores['chromas'] = alignment_fn(csm_to_binary(CSMs['chromas'], self.kappa))
+
+            ## Step 2: Compute Ws for each CSM
+            W_CSMs = {s:getWCSM(CSMs[s], self.K, self.K) for s in CSMs}
+            WCSM_sum = np.zeros_like(CSMs['mfccs'])
+            for s in W_CSMs:
+                WCSM_sum += W_CSMs[s]
+            WCSM_sum = np.exp(-WCSM_sum) # Binary thresholding uses "distances" so switch back
+            scores['early'] = alignment_fn(csm_to_binary(WCSM_sum, self.kappa))
+            if do_plot:
+                import matplotlib.pyplot as plt
+                plt.figure(figsize=(12, 6))
+                plt.subplot(121)
+                plt.imshow(csm_to_binary(WCSM_sum, self.kappa))
+                plt.subplot(122)
+                plt.imshow(np.reshape(D, (M+1, N+1)))
+                plt.title("%.3g"%scores['early'])
+                plt.show()
+
+            if self.log_times:
+                self.times['raw'].append(time.time()-tic)
+
             #for s in scores:
-            #    self.Ds[s][i, j] = scores[s]
+            #    all_scores[s] = scores[s]
+            smat[ij] = scores
+            
+        return smat
 
     def do_late_fusion(self):
         """
         Perform late fusion after all different pairwise similarity scores
         have been computed
+        Atila: ajuste para usar K e niters do construtor da classe.
+        Inclui critica para suportar funcionamento com número muito pequeno de musicas a buscas (menor que self.K).
+        Antes estava com K=20, niters=20 na chamada da doSimilarityFusion
         """
-        self.Ds["late"] = doSimilarityFusion([1.0/(1.0+self.Ds[s]) for s in ["chromas", "ssms", "mfccs"]], K=self.K, niters=20, reg_diag=1)[1]
-        self.Ds["early+late"] = doSimilarityFusion([1.0/(1.0+self.Ds[s]) for s in ["chromas", "ssms", "mfccs", "early"]], K=self.K, niters=20, reg_diag=1)[1]
-
+        niters_i = self.niters
+        n_songs = len(self.all_block_feats)
+        if self.K > (n_songs-2):
+            K_i = n_songs-2
+            print("Apenas %d musicas! Reduzindo K em Latefusion para %d"%(n_songs, K_i))
+        else:
+            K_i = self.K
+        #print("K_i = %d"%K_i)
+        self.Ds["late"] = doSimilarityFusion([1.0/(1.0+self.Ds[s]) for s in ["chromas", "ssms", "mfccs"]], K=K_i, niters=niters_i, reg_diag=1)[1]
+        self.Ds["early+late"] = doSimilarityFusion([1.0/(1.0+self.Ds[s]) for s in ["chromas", "ssms", "mfccs", "early"]], K=K_i, niters=niters_i, reg_diag=1)[1]
+        #print(self.Ds["chromas"][0])
+        #print(self.Ds["ssms"][0])
+        #print(self.Ds["mfccs"][0])
+        #print(self.Ds["early"][0])
+        #print(self.Ds["late"][0])
+        #print(self.Ds["early+late"][0])
 
 """====================================================
                 UTILITY FUNCTIONS

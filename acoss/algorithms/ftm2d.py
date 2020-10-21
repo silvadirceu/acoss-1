@@ -5,9 +5,10 @@
 import numpy as np
 import argparse
 import scipy
-from .algorithm_template import CoverAlgorithm
+from acoss.algorithms.algorithm_template import CoverAlgorithm
 import os
 import deepdish as dd
+import ray
 
 __all__ = ['FTM2D']
 
@@ -22,13 +23,18 @@ class FTM2D(CoverAlgorithm):
     chroma_type: string
         Type of chroma to use (key into features)
     """
-    def __init__(self, dataset_csv, datapath, chroma_type='hpcp', shortname='Covers80', PWR=1.96, WIN=75, C=5):
+    def __init__(self, dataset_csv = None, audios_features_vector = None, datapath = "features_benchmark", chroma_type='hpcp', onset_lib = 'librosa_onsets', shortname='Covers80', PWR=1.96, WIN=75, C=5):
+        """
+        Atila: ajustes para aceitar como parametro o vetor de features, e passar ele adiante para a CoverAlgorithm.
+        Inclui argumento onset_lib de modo a permitir indicar a fonte das onsets a ser usada.
+        """
         self.PWR = PWR
         self.WIN = WIN
         self.C = C
         self.chroma_type = chroma_type
+        self.onset_lib = onset_lib
         self.shingles = {}
-        CoverAlgorithm.__init__(self, dataset_csv=dataset_csv, name="FTM2D", datapath=datapath, shortname=shortname)
+        CoverAlgorithm.__init__(self, dataset_csv=dataset_csv, audios_features_vector = audios_features_vector, name="FTM2D", datapath=datapath, shortname=shortname)
 
     def get_cacheprefix(self):
         """
@@ -56,7 +62,9 @@ class FTM2D(CoverAlgorithm):
         feats = CoverAlgorithm.load_features(self, i)
         hpcp_orig = feats[self.chroma_type].T
         # Synchronize HPCP to the beats
-        onsets = feats['madmom_features']['onsets']
+        #onsets = feats['madmom_features']['onsets']
+        #onsets = feats['librosa_onsets']['onsets']
+        onsets = feats[self.onset_lib]['onsets']
         hpcp = librosa.util.sync(hpcp_orig, onsets, aggregate=np.median)
         chroma = chrompwr(hpcp, self.PWR)
         # Get all 2D FFT magnitude shingles
@@ -89,14 +97,52 @@ class FTM2D(CoverAlgorithm):
         for k in range(a):
             i = idxs[k][0]
             j = idxs[k][1]
-
+            
             s1 = self.load_features(i)
             s2 = self.load_features(j)
             dSqr = np.sum((s1-s2)**2)
             # Since similarity should be high for two things
             # with a small distance, take the negative exponential
             sim = np.exp(-dSqr)
+            print("FTM2D similarity entre (%d, %d) = %f"%(i, j, sim))
             self.Ds['main'][i, j] = sim
+
+    @ray.remote  #Atila: para Ray
+    def similarity_ray(self, idxs):
+        """
+        sim = {}
+        s1 = self.load_features(idxs[0])
+        s2 = self.load_features(idxs[1])
+        dSqr = np.sum((s1-s2)**2)
+        # Since similarity should be high for two things
+        # with a small distance, take the negative exponential
+        sim['main'] = np.exp(-dSqr)
+        #print("FTM2D similarity_ray entre (%d, %d) = %f"%(i, j, sim['main']))
+        #self.Ds['main'][i, j] = sim
+        return sim, idxs[0], idxs[1]
+        """
+        #(a, b) = idxs.shape
+        smat = {}
+        #for k in range(a):
+        for i, j in zip(idxs[:, 0], idxs[:, 1]):
+            sim={}
+            #i = idxs[k][0]
+            #j = idxs[k][1]
+            ij = (i,j)
+            
+            s1 = self.load_features(i)
+            s2 = self.load_features(j)
+            dSqr = np.sum((s1-s2)**2)
+            # Since similarity should be high for two things
+            # with a small distance, take the negative exponential
+            sim['main'] = np.exp(-dSqr)
+            #print("FTM2D similarity_ray entre (%d, %d) = %f"%(i, j, sim['main']))
+            #self.Ds['main'][i, j] = sim
+            smat[ij] = sim
+
+        return smat
+
+
 
 
 def chrompwr(X, P=.5):
@@ -129,9 +175,8 @@ def btchroma_to_fftmat(btchroma, win=75):
     nchrm, nbeats = btchroma.shape
     assert nchrm == 12, 'beat-aligned matrix transposed?'
     if nbeats < win:
-        btchroma = np.pad(btchroma,((0,0),(0,win-nbeats)),'constant')
-        nchrm, nbeats = btchroma.shape
-        #return None
+        print("ERRO btchroma_to_fftmat: nbeats %d < win %d"%(nbeats, win))
+        return None
     # output
     fftmat = np.zeros((nchrm * win, nbeats - win + 1))
     for i in range(nbeats-win+1):

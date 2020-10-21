@@ -2,14 +2,21 @@
 """
 A template class for all benchmark algorithms in `acoss.benchmark` module
 """
-import numpy as np
+# Standard library imports
 import glob
 import os
-import deepdish as dd
 import warnings
-from progress.bar import Bar
 
-from ..utils import create_dataset_filepaths
+# Third party imports
+import deepdish as dd
+import numpy as np
+from progress.bar import Bar
+import psutil
+import ray
+
+
+# Local application imports
+from acoss.utils import create_dataset_filepaths
 
 __all__ = ['CoverAlgorithm']
 
@@ -28,19 +35,21 @@ class CoverAlgorithm(object):
         indices index into filepaths.
     """
     def __init__(self,
-                 dataset_csv,
+                 dataset_csv = None,
+                 audios_features_vector = None,
                  name="Serra09",
                  datapath="features_benchmark",
                  shortname="full",
                  cachedir="cache",
-                 similarity_types=["main"],
-                 create_Ds= True,
-                 filepaths=None):
+                 similarity_types=["main"]):
         """
         Parameters
         ----------
         dataset_csv: string
             path to the dataset annotation csv file
+        Atila:
+        audio_features_vector: list
+            list with features of all musics. To compare first music to all others (one to N)
         name: string
             Name of the algorithm
         datapath: string
@@ -53,45 +62,23 @@ class CoverAlgorithm(object):
         self.name = name
         self.shortname = shortname
         self.cachedir = cachedir
-        if filepaths is None:
+        if dataset_csv is not None:
             self.filepaths = create_dataset_filepaths(dataset_csv, root_audio_dir=datapath, file_format=".h5")
-        else:
-            self.filepaths = filepaths
+            self.N = len(self.filepaths)
+            self.features_vector = None
+        elif audios_features_vector is not None:
+            self.features_vector = audios_features_vector
+            self.filepaths = None
+            self.N = len(self.features_vector)  
         self.cliques = {}
-        self.N = len(self.filepaths)
+        
         if not os.path.exists(cachedir):
             os.mkdir(cachedir)
-        if create_Ds:
-            self.Ds = {}
-            for s in similarity_types:
-                self.Ds[s] = np.memmap('%s_%s_dmat' % (self.get_cacheprefix(), s), shape=(self.N, self.N), mode='w+', dtype='float32')
+        self.Ds = {}
+        for s in similarity_types:
+            self.Ds[s] = np.memmap('%s_%s_dmat' % (self.get_cacheprefix(), s), shape=(self.N, self.N), mode='w+', dtype='float32')
         print("Initialized %s algorithm on %i songs in dataset %s" % (name, self.N, shortname))
-
-    def get_filepaths(self):
-        return self.filepaths
-
-    def get_Ds(self):
-        return self.Ds
-
-    def set_Ds(self,Ds):
-        self.Ds = Ds
-
-    def set_Ds_from_position (self,score,i,j):
-        for s in score:
-            self.Ds[s][i, j] = score[s]
-
-    def set_Ds_results(self,results):
-        """
-        Set Ds from a vector of similarity results
-        Parameters
-        ----------
-        results: list
-            results is a list of (scores, i, j)
-        """
-
-        for result in results:
-            self.set_Ds_from_position(*result)
-
+    
     def get_cacheprefix(self):
         """
         Return a descriptive file prefix to use for caching features
@@ -118,7 +105,11 @@ class CoverAlgorithm(object):
         feats: dictionary
             Dictionary of features for the song
         """
-        feats = dd.io.load(self.filepaths[i])
+        #Atila: modificado para usar dados do vetor de features
+        if self.features_vector is not None:
+            feats = self.features_vector[i]
+        else:
+            feats = dd.io.load(self.filepaths[i])
         # Keep track of what cover clique it's in
         if not feats['label'] in self.cliques:
             self.cliques[feats['label']] = set([])
@@ -129,24 +120,29 @@ class CoverAlgorithm(object):
         """
         Load all h5 files to get clique information as a side effect
         """
-        import os
-        filepath = "%s_clique_info.txt" % self.get_cacheprefix()
-        if not os.path.exists(filepath):
-            fout = open(filepath, "w")
-            for i in range(len(self.filepaths)):
-                feats = CoverAlgorithm.load_features(self, i)
-                if verbose:
-                    print(i)
-                fout.write("%i,%s\n"%(i, feats['label']))
-            fout.close()
+        #import os
+        if self.filepaths is not None:
+            filepath = "%s_clique_info.txt" % self.get_cacheprefix()
+            if not os.path.exists(filepath):
+                fout = open(filepath, "w")
+                for i in range(len(self.filepaths)):
+                    feats = CoverAlgorithm.load_features(self, i)
+                    if verbose:
+                        print(i)
+                    print(feats['label'])
+                    fout.write("%i,%s\n"%(i, feats['label']))
+                fout.close()
+            else:
+                fin = open(filepath)
+                for line in fin.readlines():
+                    i, label = line.split(",")
+                    label = label.strip()
+                    if not label in self.cliques:
+                        self.cliques[label] = set([])
+                    self.cliques[label].add(int(i))
         else:
-            fin = open(filepath)
-            for line in fin.readlines():
-                i, label = line.split(",")
-                label = label.strip()
-                if not label in self.cliques:
-                    self.cliques[label] = set([])
-                self.cliques[label].add(int(i))
+            print("Sem filepaths")
+            return
 
     def similarity(self, idxs):
         """
@@ -168,46 +164,124 @@ class CoverAlgorithm(object):
             j = idxs[k][1]
             score = 0.0
             self.Ds["main"][i, j] = score
+    
+    @ray.remote
+    def similarity_ray(self, idxs):
+        """
+        Given the indices of two songs, return a number
+        which is high if the songs are similar, and low
+        otherwise, for each similarity type
+        Also store this number in D[i, j]
+        as a side effect
+        Parameters
+        ----------
+        i: int
+            Index of first song in self.filepaths
+        j: int
+            Index of second song in self.filepaths
+        """
+        score={}
+        i = idxs[0]
+        j = idxs[1]
+        score["main"] = 0.0
+        #self.Ds["main"][i, j] = score
+        return score, i, j
+        """
+        (a, b) = idxs.shape
+        for k in range(a):
+            i = idxs[k][0]
+            j = idxs[k][1]
+            score = 0.0
+            #self.Ds["main"][i, j] = score
+            return score, i, j
+        """
 
-    def generate_pairs(self, n_cores=None, n_chunks=1, symmetric=False, precomputed=False):
-        from itertools import combinations, permutations
-        h5filename = "%s_Ds.h5" % self.get_cacheprefix()
 
-        chunks=None
-
-        if precomputed:
-            self.Ds = dd.io.load(h5filename)
-            self.get_all_clique_ids()
-        else:
-            if symmetric:
-                all_pairs = [(i, j) for idx, (i, j) in enumerate(combinations(range(len(self.filepaths)), 2))]
+    
+    
+    def one_N_pairwise(self, parallel=0, n_cores=0):
+        """
+        Atila:
+        Faz comparação das features do primeiro audio num array de features, contra as features de todos os demais no array.
+        Opera sobre self.features_vector, chamando self.similarity, que é a rotina que calcula o score entre pares de musicas, de acordo com cada algoritmo.
+        Parameters 
+        ----------
+        parallel: int
+            If 0, run serial.  If 1, run parallel
+        n_cores: int
+            Number of cores to use in a parallel scenario. If -1, all available cores
+        """
+        from itertools import product
+        #all_pairs = [(i, j) for idx, (i, j) in enumerate(combinations(range(len(self.features_vector)), 2))]
+        #one_n_pairs = all_pairs[:len(self.features_vector)-1]
+        one_n_pairs = [(i, j) for idx, (i, j) in enumerate(product([0],range(1,len(self.features_vector))))]
+        
+        if parallel == 1:
+            #Atila: usando Ray para processamento paralelo
+            #import ray
+            # if n_cores == -1:
+            #     n_cores = psutil.cpu_count(logical=False)
+            # ray.init(num_cpus=n_cores)
+            
+            N_pairs_core = 20 # Testando com xxx
+            if len(one_n_pairs) < N_pairs_core:
+                print("Campo de busca pequeno. Reduzindo N_pairs_core para 1")
+                N_pairs_core = 1
+            chunks = np.array_split(one_n_pairs, len(one_n_pairs)//N_pairs_core) # Vamos dividir de modo que N_pairs_core buscas sejam feitas em cada core (1 busca é rapido demais)  
+            #chunks = np.array_split(one_n_pairs, len(one_n_pairs)) # Vamos dividir de modo que cada similaridade rode em um core
+            remaining_ids = []
+            if n_cores > len(chunks):  #Verificando se por acaso temos mais cores do que tarefas. 
+                n_proc = len(chunks)  # Nesse caso vamos disparar menos processos
             else:
-                all_pairs = [(i, j) for idx, (i, j) in enumerate(permutations(range(len(self.filepaths)), 2))]
+                n_proc = n_cores
+            print("Paralelo com Ray. Vamos usar %d cores."%n_proc)
+            progressbar = Bar('Running one to %d parallel comparisons between query and reference song'%len(chunks), 
+                            max=len(chunks), 
+                            suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
+            for k in range(0,n_proc):       # loop sem wait, para iniciar processos
+                remaining_ids.append(self.similarity_ray.remote(self,chunks[k]))  # Vamos disparar tantos processos quantos cores tenhamos
+            #print("Todos os cores iniciados e executando. Vamos ao wait.")
+            for k in range(n_proc, len(chunks)): # loop com wait, para seguir e tratar demais tarefas
+                ready_ids, remaining_ids = ray.wait(remaining_ids)  #Esperando algum core terminar
 
-            if n_cores is not None:
-                n_chunks = n_cores
-            elif n_chunks > len(all_pairs):
-                n_chunks = len(all_pairs)
-
-            chunks = np.array_split(all_pairs, n_chunks)
-
-        return chunks
-
-
-    def apply_simmetry(self, symmetric=False):
-
-        h5filename = "%s_Ds.h5" % self.get_cacheprefix()
-
-        if symmetric:
-            for similarity_type in self.Ds:
-                self.Ds[similarity_type] += self.Ds[similarity_type].T
-                # if verbose:
-                #    progressbar.next()
-
-        dd.io.save(h5filename, self.Ds)
-
-
-    def all_pairwise(self, parallel=0, n_cores=12, symmetric=False, precomputed=False, verbose=True):
+                for smat in ray.get(ready_ids):
+                    for ij in smat.keys():
+                        i = ij[0]
+                        j = ij[1]
+                        score = smat[ij]
+                        for sk in score.keys():
+                            self.Ds[sk][i, j] = score[sk]
+                    progressbar.next()
+                #print("Objeto OID: %s, k: %d pronto para a proxima."%(ready_ids,k))
+                remaining_ids.append(self.similarity_ray.remote(self,chunks[k]))  #Vagou. Vamos enviar proxima tarefa
+            
+            for smat in ray.get(remaining_ids):
+                for ij in smat.keys():
+                    i = ij[0]
+                    j = ij[1]
+                    score = smat[ij]            
+                    for sk in score.keys():
+                        self.Ds[sk][i, j] = score[sk]
+                progressbar.next()
+            ray.shutdown()
+            progressbar.finish()
+            #Atila: fim uso Ray.
+            
+            self.get_all_clique_ids() # Since nothing has been cached
+        else:
+            progressbar = Bar('Running one to %d sequential comparisons between query and reference song'%len(one_n_pairs), 
+                            max=len(one_n_pairs), 
+                            suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
+            for idx, (i, j) in enumerate(one_n_pairs):
+                self.similarity(np.array([[i, j]]))
+                if idx % 100 == 0:
+                    print((i, j))
+                progressbar.next()
+            progressbar.finish()
+        return(self.Ds)
+   
+    
+    def all_pairwise(self, parallel=0, n_cores=12, symmetric=False, precomputed=False):
         """
         Do all pairwise comparisons between songs, with code that is 
         amenable to parallelizations.
@@ -219,7 +293,7 @@ class CoverAlgorithm(object):
         parallel: int
             If 0, run serial.  If 1, run parallel
         n_cores: int
-            Number of cores to use in a parallel scenario
+            Number of cores to use in a parallel scenario. If -1, all available cores.
         symmetric: boolean
             Whether comparisons between pairs of songs are symmetric.  If so, the
             computation can be halved
@@ -229,8 +303,6 @@ class CoverAlgorithm(object):
         """
         from itertools import combinations, permutations
         h5filename = "%s_Ds.h5" % self.get_cacheprefix()
-        progressbar = None
-
         if precomputed:
             self.Ds = dd.io.load(h5filename)
             self.get_all_clique_ids()
@@ -239,32 +311,79 @@ class CoverAlgorithm(object):
                 all_pairs = [(i, j) for idx, (i, j) in enumerate(combinations(range(len(self.filepaths)), 2))]
             else:
                 all_pairs = [(i, j) for idx, (i, j) in enumerate(permutations(range(len(self.filepaths)), 2))]
-            chunks = np.array_split(all_pairs, 45)
+            #chunks = np.array_split(all_pairs, 45) #??? Por que 45 ???
+            #chunks = np.array_split(all_pairs, n_cores)
 
             if parallel == 1:
-                from joblib import Parallel, delayed
-                Parallel(n_jobs=n_cores, verbose=1)(
-                    delayed(self.similarity)(chunks[i]) for i in range(len(chunks)))
+                #from joblib import Parallel, delayed
+                #Parallel(n_jobs=n_cores, verbose=1)(
+                #    delayed(self.similarity)(chunks[i]) for i in range(len(chunks)))
+                    
+                #Atila: usando Ray para processamento paralelo
+                #import ray
+
+                # if n_cores == -1:
+                #     n_cores = psutil.cpu_count(logical=False)
+                # ray.init(num_cpus=n_cores)
+
+                N_pairs_core = 20 # Testando com xxx
+                chunks = np.array_split(all_pairs, len(all_pairs)//N_pairs_core) # Vamos dividir de modo que N_pairs_core buscas sejam feitas em cada core (1 busca é rapido demais)
+                #print("Trabalhando com %d pares por core - total de chunks = %d"%(N_pairs_core, len(chunks)))
+                remaining_ids = []
+                if n_cores > len(chunks):  #Verificando se por acaso temos mais cores do que tarefas. 
+                    n_proc = len(chunks)  # Nesse caso vamos disparar menos processos
+                else:
+                    n_proc = n_cores
+                    
+                print("Paralelo com Ray. Vamos usar %d cores."%n_proc)
+                progressbar = Bar('Running pairwise between all combinations of query and reference song, using %d CPUs'%n_proc, 
+                                max=len(chunks) + len(self.Ds) , 
+                                suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
+                for k in range(0,n_proc):       # loop sem wait, para iniciar processos
+                    remaining_ids.append(self.similarity_ray.remote(self,chunks[k]))  # Vamos disparar tantos processos quantos cores tenhamos
+                    #remaining_ids.append(self.similarity_ray.remote(self,all_pairs[k]))  # Vamos disparar tantos processos quantos cores tenhamos
+                #print("Todos os cores iniciados e executando. Vamos ao wait.")
+                for k in range(n_proc, len(chunks)): # loop com wait, para seguir e tratar demais tarefas
+                    ready_ids, remaining_ids = ray.wait(remaining_ids)  #Esperando algum core terminar
+                    for smat in ray.get(ready_ids):
+                        for ij in smat.keys():
+                            i = ij[0]
+                            j = ij[1]
+                            score = smat[ij]
+                            for sk in score.keys():
+                                self.Ds[sk][i, j] = score[sk]
+                        progressbar.next()
+                    #print("Objeto OID: %s, k: %d pronto para a proxima."%(ready_ids,k))
+                    remaining_ids.append(self.similarity_ray.remote(self,chunks[k]))  #Vagou. Vamos enviar proximo chunk
+                    #remaining_ids.append(self.similarity_ray.remote(self,all_pairs[k]))  #Vagou. Vamos enviar proxima tarefa
+                
+                for smat in ray.get(remaining_ids):
+                    for ij in smat.keys():
+                        i = ij[0]
+                        j = ij[1]
+                        score = smat[ij]
+                        for sk in score.keys():
+                            self.Ds[sk][i, j] = score[sk]
+                    progressbar.next()
+                ray.shutdown()
+                #progressbar.finish()
+                #Atila: fim uso Ray.
+                    
                 self.get_all_clique_ids() # Since nothing has been cached
             else:
-
-                if verbose:
-                    progressbar = Bar('Running pairwise between all combinations of query and reference song',
-                                    max=len(all_pairs) + len(self.Ds) ,
-                                    suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
+                progressbar = Bar('Running pairwise between all combinations of query and reference song', 
+                                max=len(all_pairs) + len(self.Ds) , 
+                                suffix='%(index)d/%(max)d - %(percent).1f%% - %(eta)ds')
                 for idx, (i, j) in enumerate(all_pairs):
                     self.similarity(np.array([[i, j]]))
-                    if progressbar is not None and verbose:
-                        if idx % 100 == 0:
-                            print((i, j))
-                        progressbar.next()
+                    if idx % 100 == 0:
+                        print((i, j))
+                    progressbar.next()
             if symmetric:
                 for similarity_type in self.Ds:
                     self.Ds[similarity_type] += self.Ds[similarity_type].T
-                    #if verbose:
-                    #    progressbar.next()
-            if progressbar is not None and verbose:
-                progressbar.finish()
+                    progressbar.next()
+            progressbar.finish()
             dd.io.save(h5filename, self.Ds)    
 
     def cleanup_memmap(self):
@@ -289,6 +408,7 @@ class CoverAlgorithm(object):
         """
         from itertools import chain
         D = np.array(self.Ds[similarity_type], dtype=np.float32)
+        #print(D)  #Atila para debug
         N = D.shape[0]
         # Step 1: Re-sort indices of D so that
         # cover cliques are contiguous
@@ -337,6 +457,7 @@ class CoverAlgorithm(object):
             AllMap[i] = np.mean(P)
         MAP = np.nanmean(AllMap)
         ranks = ranks[np.isnan(ranks) == 0]
+        print(ranks)
         MR = np.mean(ranks)
         MRR = 1.0/N*(np.sum(1.0/ranks))
         MDR = np.median(ranks)
